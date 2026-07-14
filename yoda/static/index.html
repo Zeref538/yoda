@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YODA — Your Offline Data Agent</title>
+<style>
+  :root{
+    --bg:#0F172A; --surface:#1E293B; --muted:#272F42; --border:#3B4761;
+    --fg:#F8FAFC; --fg-dim:#94A3B8; --accent:#22C55E; --accent-dim:#14532D;
+    --warn:#FACC15; --danger:#EF4444; --info:#38BDF8;
+    --mono:ui-monospace,'Cascadia Code',Consolas,Menlo,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html{color-scheme:dark}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);
+       font-size:16px;line-height:1.55;min-height:100dvh}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:.75rem;
+         padding:.8rem 1.25rem;background:rgba(15,23,42,.92);backdrop-filter:blur(6px);
+         border-bottom:1px solid var(--border)}
+  header .logo{display:flex;align-items:center;gap:.55rem;font-weight:700;font-size:1.05rem}
+  header .logo svg{color:var(--accent)}
+  .badge{display:inline-flex;align-items:center;gap:.35rem;font-size:.75rem;
+         font-family:var(--mono);color:var(--accent);background:var(--accent-dim);
+         border:1px solid var(--accent);border-radius:999px;padding:.15rem .6rem}
+  .pulse{width:.5rem;height:.5rem;border-radius:50%;background:var(--accent)}
+
+  main{max-width:72rem;margin:0 auto;padding:1.5rem 1.25rem 4rem}
+
+  /* stepper */
+  .steps{display:flex;gap:.25rem;margin:0 0 1.5rem;padding:0;list-style:none;
+         font-size:.8rem;font-family:var(--mono);overflow-x:auto}
+  .steps li{flex:1;min-width:7rem;text-align:center;padding:.5rem .25rem;
+            border-bottom:3px solid var(--border);color:var(--fg-dim);white-space:nowrap}
+  .steps li.active{border-color:var(--accent);color:var(--fg);font-weight:600}
+  .steps li.done{border-color:var(--accent-dim);color:var(--accent)}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:.75rem;
+        padding:1.25rem;margin-bottom:1.25rem}
+  .card h2{font-size:1.05rem;margin-bottom:.25rem;display:flex;align-items:center;gap:.5rem}
+  .card h2 svg{color:var(--accent);flex-shrink:0}
+  .card p.sub{color:var(--fg-dim);font-size:.85rem;margin-bottom:1rem}
+  .hidden{display:none!important}
+
+  /* dropzone */
+  .drop{border:2px dashed var(--border);border-radius:.75rem;padding:2.5rem 1rem;
+        text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--muted)}
+  .drop svg{color:var(--fg-dim);margin-bottom:.5rem}
+  .drop .hint{color:var(--fg-dim);font-size:.85rem}
+
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid var(--muted)}
+  th{color:var(--fg-dim);font-weight:600;font-size:.75rem;text-transform:uppercase;
+     letter-spacing:.05em}
+  td.num,th.num{text-align:right;font-family:var(--mono)}
+  td .col{font-family:var(--mono);color:var(--info)}
+  .table-wrap{overflow-x:auto}
+
+  button{font:inherit;cursor:pointer;border-radius:.55rem;padding:.55rem 1.1rem;
+         border:1px solid var(--border);background:var(--muted);color:var(--fg);
+         transition:background .15s,border-color .15s,opacity .15s;min-height:44px}
+  button:hover{border-color:var(--fg-dim)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#06220f;
+                 font-weight:700}
+  button.primary:hover{background:#4ade80}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .row{display:flex;gap:.75rem;flex-wrap:wrap;align-items:center}
+  .grow{flex:1}
+
+  select,input[type=text]{font:inherit;background:var(--bg);color:var(--fg);
+        border:1px solid var(--border);border-radius:.55rem;padding:.5rem .7rem;min-height:44px}
+  select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  label{font-size:.8rem;color:var(--fg-dim);display:block;margin-bottom:.25rem}
+
+  /* plan steps */
+  .step-item{display:flex;gap:.8rem;align-items:flex-start;padding:.8rem;
+             border:1px solid var(--border);border-radius:.6rem;margin-bottom:.6rem;
+             background:var(--bg);transition:opacity .2s,border-color .2s}
+  .step-item.off{opacity:.45}
+  .step-item input[type=checkbox]{width:1.35rem;height:1.35rem;margin-top:.2rem;
+             accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+  .step-item .tool{font-family:var(--mono);font-weight:600;color:var(--accent)}
+  .step-item .reason{color:var(--fg-dim);font-size:.85rem}
+  .step-item .params{font-family:var(--mono);font-size:.78rem;color:var(--warn)}
+
+  .status-ok{color:var(--accent)} .status-error{color:var(--danger)}
+  .status-skipped{color:var(--warn)}
+  .v-resolved{color:var(--accent)} .v-flagged{color:var(--info)}
+  .v-partially_resolved{color:var(--warn)} .v-unresolved,.v-new_issue{color:var(--danger)}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));
+        gap:.75rem;margin-bottom:1rem}
+  .kpi{background:var(--bg);border:1px solid var(--border);border-radius:.6rem;
+       padding:.8rem;text-align:center}
+  .kpi .n{font-family:var(--mono);font-size:1.5rem;font-weight:700;color:var(--accent)}
+  .kpi .l{font-size:.72rem;color:var(--fg-dim);text-transform:uppercase;letter-spacing:.05em}
+
+  .note{font-size:.8rem;color:var(--fg-dim);border-left:3px solid var(--accent);
+        padding:.4rem .8rem;background:var(--muted);border-radius:0 .4rem .4rem 0;
+        margin:.75rem 0}
+  .error-box{color:var(--danger);border-left:3px solid var(--danger);padding:.4rem .8rem;
+        background:var(--muted);border-radius:0 .4rem .4rem 0;margin:.75rem 0}
+  .spinner{display:inline-block;width:1rem;height:1rem;border:2px solid var(--fg-dim);
+        border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;
+        vertical-align:-.15rem;margin-right:.4rem}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  pre.report{white-space:pre-wrap;font-family:var(--mono);font-size:.8rem;
+        background:var(--bg);border:1px solid var(--border);border-radius:.6rem;
+        padding:1rem;max-height:28rem;overflow:auto}
+  footer{color:var(--fg-dim);font-size:.75rem;text-align:center;padding:1rem}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+    </svg>
+    YODA <span style="color:var(--fg-dim);font-weight:400">— Your Offline Data Agent</span>
+  </div>
+  <div class="grow"></div>
+  <span class="badge" title="The model sees metadata only; requests go to localhost:11434">
+    <span class="pulse"></span> 100% LOCAL
+  </span>
+</header>
+
+<main>
+  <ol class="steps" id="stepper">
+    <li data-s="1" class="active">1 Upload</li>
+    <li data-s="2">2 Profile</li>
+    <li data-s="3">3 Plan</li>
+    <li data-s="4">4 Approve</li>
+    <li data-s="5">5 Results</li>
+  </ol>
+
+  <!-- 1 UPLOAD -->
+  <section class="card" id="card-upload">
+    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload a file</h2>
+    <p class="sub">CSV, Excel or SQLite. It never leaves this machine — the server is
+       <code>127.0.0.1</code> only.</p>
+    <div class="drop" id="drop" role="button" tabindex="0"
+         aria-label="Upload a CSV, Excel or SQLite file">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <div><strong>Drop a file here</strong> or click to browse</div>
+      <div class="hint">.csv · .xlsx · .sqlite</div>
+      <input type="file" id="file" accept=".csv,.xlsx,.xls,.sqlite,.db,.sqlite3" hidden>
+    </div>
+    <div id="upload-error"></div>
+  </section>
+
+  <!-- 2 PROFILE -->
+  <section class="card hidden" id="card-profile">
+    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Profile — issues detected <span style="color:var(--fg-dim);font-weight:400">(pure pandas, no AI yet)</span></h2>
+    <p class="sub" id="profile-sub"></p>
+    <div class="table-wrap"><table id="issues-table" aria-label="Detected issues">
+      <thead><tr><th>Issue</th><th>Column</th><th class="num">Count</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="note">Only this statistical profile — with redacted samples — is ever
+      shown to the model. Your rows stay in this process's memory.</div>
+    <div class="row" style="margin-top:1rem">
+      <div><label for="planner">Planner</label>
+        <select id="planner">
+          <option value="llm">Local LLM (Ollama)</option>
+          <option value="rule_based">Rule-based baseline (no AI)</option>
+        </select></div>
+      <div><label for="model">Model</label>
+        <input type="text" id="model" value="qwen3.5:4b" size="14"></div>
+      <div style="align-self:flex-end">
+        <button class="primary" id="btn-plan">Generate plan</button></div>
+    </div>
+    <div id="plan-error"></div>
+  </section>
+
+  <!-- 3/4 PLAN + APPROVE -->
+  <section class="card hidden" id="card-plan">
+    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Approve the plan</h2>
+    <p class="sub" id="plan-sub"></p>
+    <div id="plan-steps"></div>
+    <div class="note">Nothing runs without your approval. Untick any step to skip it.</div>
+    <div class="row" style="margin-top:1rem">
+      <button class="primary" id="btn-execute">Execute approved steps</button>
+      <span id="exec-status" role="status" aria-live="polite"></span>
+    </div>
+    <div id="exec-error"></div>
+  </section>
+
+  <!-- 5 RESULTS -->
+  <section class="card hidden" id="card-results">
+    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Results</h2>
+    <div class="kpis" id="kpis"></div>
+    <h3 style="font-size:.9rem;margin:.5rem 0">Executed steps</h3>
+    <div class="table-wrap"><table id="audit-table" aria-label="Executed steps">
+      <thead><tr><th>Tool</th><th>Column</th><th class="num">Rows affected</th>
+             <th>Status</th></tr></thead><tbody></tbody>
+    </table></div>
+    <h3 style="font-size:.9rem;margin:1rem 0 .5rem">Verification — did it actually work?</h3>
+    <div class="table-wrap"><table id="verdict-table" aria-label="Verification verdicts">
+      <thead><tr><th>Issue</th><th>Column</th><th class="num">Before</th>
+             <th class="num">After</th><th>Verdict</th></tr></thead><tbody></tbody>
+    </table></div>
+    <div id="followup-box" class="hidden">
+      <div class="note" style="border-color:var(--warn)">The verifier found issues that
+        survived round 1. Review the follow-up plan below (max 1 extra round).</div>
+      <div id="followup-steps"></div>
+      <button class="primary" id="btn-followup">Run follow-up round</button>
+    </div>
+    <div class="row" style="margin-top:1.25rem">
+      <a href="/api/download" download><button class="primary">Download cleaned CSV</button></a>
+      <button id="btn-report">View report</button>
+    </div>
+    <pre class="report hidden" id="report"></pre>
+  </section>
+
+  <footer>AI plans from metadata only · deterministic pandas executes · every change
+    audited · <a href="https://github.com/Zeref538/yoda" style="color:var(--fg-dim)">github.com/Zeref538/yoda</a></footer>
+</main>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+let planSteps = [], followupSteps = [];
+
+function setStep(n){
+  document.querySelectorAll("#stepper li").forEach(li=>{
+    const s = +li.dataset.s;
+    li.classList.toggle("active", s===n);
+    li.classList.toggle("done", s<n);
+  });
+}
+function show(id){ $(id).classList.remove("hidden"); $(id).scrollIntoView({behavior:"smooth",block:"start"}); }
+function err(sel,msg){ $(sel).innerHTML = msg?`<div class="error-box">${msg}</div>`:""; }
+async function api(url,opts){
+  const r = await fetch(url,opts);
+  if(!r.ok){ const d = await r.json().catch(()=>({detail:r.statusText}));
+             throw new Error(d.detail||r.statusText); }
+  return r;
+}
+
+/* ---- upload ---- */
+const drop = $("#drop"), fileInput = $("#file");
+drop.addEventListener("click", ()=>fileInput.click());
+drop.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();fileInput.click();} });
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop", e=>{ if(e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); });
+fileInput.addEventListener("change", ()=>{ if(fileInput.files[0]) upload(fileInput.files[0]); });
+
+async function upload(file){
+  err("#upload-error","");
+  drop.innerHTML = '<span class="spinner"></span> Profiling ' + file.name + '…';
+  try{
+    const fd = new FormData(); fd.append("file", file);
+    const d = await (await api("/api/upload",{method:"POST",body:fd})).json();
+    $("#profile-sub").textContent =
+      `${d.name} — ${d.n_rows} rows x ${d.n_cols} columns, ${d.issues.length} issue signal(s) found.`;
+    const tb = $("#issues-table tbody"); tb.innerHTML = "";
+    d.issues.forEach(i=>{
+      tb.insertAdjacentHTML("beforeend",
+        `<tr><td>${i.issue}</td><td><span class="col">${i.col??"whole table"}</span></td>
+         <td class="num">${i.count}</td></tr>`);
+    });
+    setStep(2); show("#card-profile");
+  }catch(e){ err("#upload-error", e.message); }
+  drop.innerHTML = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <div><strong>Drop a file here</strong> or click to browse</div>
+    <div class="hint">.csv · .xlsx · .sqlite</div>`;
+  drop.appendChild(fileInput);
+}
+
+/* ---- plan ---- */
+$("#btn-plan").addEventListener("click", async ()=>{
+  err("#plan-error","");
+  const btn = $("#btn-plan"); btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Planning…';
+  try{
+    const d = await (await api("/api/plan",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({planner:$("#planner").value, model:$("#model").value})})).json();
+    planSteps = d.steps;
+    const src = d.outcome.source==="rule_based" ? "rule-based baseline (no AI)"
+      : d.outcome.source==="fallback_rule_based"
+      ? "LLM failed — deterministic fallback plan"
+      : `${$("#model").value}, valid JSON in ${d.outcome.attempts} attempt(s)`;
+    $("#plan-sub").textContent = `Plan source: ${src}. ${d.steps.length} step(s) proposed.`;
+    renderSteps("#plan-steps", planSteps);
+    setStep(4); show("#card-plan");
+  }catch(e){ err("#plan-error", e.message); }
+  btn.disabled = false; btn.textContent = "Generate plan";
+});
+
+function renderSteps(sel, steps){
+  const box = $(sel); box.innerHTML = "";
+  steps.forEach((s,i)=>{
+    const params = Object.keys(s.params||{}).length ? JSON.stringify(s.params) : "";
+    box.insertAdjacentHTML("beforeend", `
+      <div class="step-item" data-i="${i}">
+        <input type="checkbox" checked id="${sel.slice(1)}-${i}"
+               aria-label="Include step: ${s.tool} on ${s.col??"whole table"}">
+        <div>
+          <div><span class="tool">${s.tool}</span>
+               <span class="col">(${s.col??"whole table"})</span>
+               ${params?`<span class="params">${params}</span>`:""}</div>
+          <div class="reason">${s.reason||""}</div>
+        </div>
+      </div>`);
+  });
+  box.querySelectorAll("input[type=checkbox]").forEach(cb=>{
+    cb.addEventListener("change", ()=>cb.closest(".step-item").classList.toggle("off", !cb.checked));
+  });
+}
+function checkedSteps(sel, steps){
+  return [...$(sel).querySelectorAll(".step-item")]
+    .filter(el=>el.querySelector("input").checked)
+    .map(el=>steps[+el.dataset.i]);
+}
+
+/* ---- execute ---- */
+$("#btn-execute").addEventListener("click", ()=>runSteps(checkedSteps("#plan-steps",planSteps),"#btn-execute","#exec-error"));
+$("#btn-followup").addEventListener("click", ()=>runSteps(checkedSteps("#followup-steps",followupSteps),"#btn-followup","#exec-error"));
+
+async function runSteps(steps, btnSel, errSel){
+  err(errSel,"");
+  if(!steps.length){ err(errSel,"No steps selected."); return; }
+  const btn = $(btnSel); btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Executing…';
+  try{
+    const d = await (await api("/api/execute",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({steps})})).json();
+    renderResults(d);
+    setStep(5); show("#card-results");
+  }catch(e){ err(errSel, e.message); }
+  btn.disabled = false;
+  btn.textContent = btnSel==="#btn-execute" ? "Execute approved steps" : "Run follow-up round";
+}
+
+function renderResults(d){
+  const changed = d.audit.reduce((a,e)=>a+(e.rows_affected||0),0);
+  const open = d.verdicts.filter(v=>["unresolved","new_issue"].includes(v.verdict)).length;
+  $("#kpis").innerHTML = `
+    <div class="kpi"><div class="n">${d.n_rows_before} &rarr; ${d.n_rows_after}</div><div class="l">rows</div></div>
+    <div class="kpi"><div class="n">${changed}</div><div class="l">changes this round</div></div>
+    <div class="kpi"><div class="n">${d.round}/2</div><div class="l">rounds</div></div>
+    <div class="kpi"><div class="n" style="color:${open? "var(--warn)":"var(--accent)"}">${open}</div><div class="l">issues open</div></div>`;
+  const at = $("#audit-table tbody"); at.innerHTML = "";
+  d.audit.forEach(e=>{
+    at.insertAdjacentHTML("beforeend",
+      `<tr><td class="tool" style="font-family:var(--mono)">${e.tool}</td>
+       <td><span class="col">${e.col??"—"}</span></td>
+       <td class="num">${e.rows_affected??0}</td>
+       <td class="status-${e.status}">${e.status}${e.error?` — ${e.error}`:""}</td></tr>`);
+  });
+  const vt = $("#verdict-table tbody"); vt.innerHTML = "";
+  const order = {unresolved:0,new_issue:0,partially_resolved:1,flagged:2,resolved:3};
+  [...d.verdicts].sort((a,b)=>(order[a.verdict]??9)-(order[b.verdict]??9)).forEach(v=>{
+    vt.insertAdjacentHTML("beforeend",
+      `<tr><td>${v.issue}</td><td><span class="col">${v.col??"whole table"}</span></td>
+       <td class="num">${v.before}</td><td class="num">${v.after}</td>
+       <td class="v-${v.verdict}">${v.verdict.replaceAll("_"," ")}</td></tr>`);
+  });
+  followupSteps = d.followup||[];
+  $("#followup-box").classList.toggle("hidden", !followupSteps.length);
+  if(followupSteps.length) renderSteps("#followup-steps", followupSteps);
+  $("#report").classList.add("hidden");
+}
+
+$("#btn-report").addEventListener("click", async ()=>{
+  const md = await (await api("/api/report")).text();
+  const pre = $("#report"); pre.textContent = md; pre.classList.remove("hidden");
+});
+</script>
+</body>
+</html>

@@ -239,6 +239,23 @@ def clean(
         border_style="green", title="Results"))
 
 
+@app.command()
+def web(
+    port: int = typer.Option(8000, help="Port on 127.0.0.1"),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Don't auto-open a browser"),
+) -> None:
+    """Launch the local web UI (binds to 127.0.0.1 only — never exposed)."""
+    try:
+        from yoda.web import serve
+    except ImportError:
+        console.print("[red]Web UI dependencies missing.[/red] "
+                      "Install with: pip install 'yoda-agent[web]'")
+        raise typer.Exit(code=1)
+    _banner("local web UI - binds to 127.0.0.1 only - Ctrl+C to stop")
+    console.print(f"Serving at [bold]http://127.0.0.1:{port}[/bold]")
+    serve(port=port, open_browser=not no_browser)
+
+
 @app.command("profile")
 def profile_cmd(
     path: str = typer.Argument(..., help="File to profile"),

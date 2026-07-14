@@ -25,6 +25,15 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "faker>=24.0",
+    "httpx>=0.27",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+]
+web = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
 ]
 
 [project.scripts]
@@ -32,6 +41,9 @@ yoda = "yoda.cli:app"
 
 [tool.setuptools]
 packages = ["yoda", "yoda.tools"]
+
+[tool.setuptools.package-data]
+yoda = ["static/*.html"]
 
 [tool.ruff]
 line-length = 100
