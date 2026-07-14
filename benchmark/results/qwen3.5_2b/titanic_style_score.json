@@ -1,0 +1,64 @@
+{
+  "dataset": "titanic_style",
+  "per_type": {
+    "category_casing": {
+      "n": 80,
+      "detected": 80,
+      "fixed": 80,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "dtype_corruption": {
+      "n": 40,
+      "detected": 40,
+      "fixed": 35,
+      "detection_rate": 1.0,
+      "fix_rate": 0.875
+    },
+    "duplicate": {
+      "n": 12,
+      "detected": 12,
+      "fixed": 12,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "null": {
+      "n": 80,
+      "detected": 80,
+      "fixed": 80,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "outlier": {
+      "n": 40,
+      "detected": 40,
+      "fixed": 34,
+      "detection_rate": 1.0,
+      "fix_rate": 0.85
+    },
+    "whitespace": {
+      "n": 40,
+      "detected": 40,
+      "fixed": 40,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    }
+  },
+  "overall": {
+    "n_errors": 292,
+    "detection_rate": 1.0,
+    "fix_rate": 0.9623,
+    "false_fix_rate": 0.0,
+    "n_clean_cells_checked": 2531,
+    "n_false_fixes": 0
+  },
+  "planner_outcome": {
+    "source": "fallback_rule_based",
+    "attempts": 3,
+    "errors": [
+      "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+      "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+      "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+    ]
+  }
+}

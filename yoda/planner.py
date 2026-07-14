@@ -1,9 +1,10 @@
 """Planner: proposes a cleaning plan from the profile only.
 
 Two implementations share one interface:
-- RuleBasedPlanner (Phase 1): deterministic heuristics — the mandatory baseline.
-- LLMPlanner (Phase 2): local model via Ollama, strict-JSON output validated
-  against a JSON Schema, max 3 retries, falls back to the rule-based plan.
+- RuleBasedPlanner: deterministic heuristics — the mandatory baseline.
+- LLMPlanner: local model via Ollama, strict-JSON output validated against a
+  JSON Schema plus semantic checks, max 3 retries, falls back to the
+  rule-based plan. The prompt contains ONLY the profile (already redacted).
 
 A plan is a list of steps:
     {"tool": "normalize_dates", "col": "birthday",
@@ -12,7 +13,67 @@ A plan is a list of steps:
 
 from __future__ import annotations
 
+import json
 import re
+import urllib.error
+import urllib.request
+
+import jsonschema
+
+TOOL_NAMES = [
+    "drop_duplicates", "normalize_dates", "normalize_phone", "normalize_currency",
+    "standardize_categories", "fix_dtypes", "impute_missing", "flag_outliers",
+    "trim_whitespace", "validate_rule", "rename_columns",
+]
+
+PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "tool": {"type": "string", "enum": TOOL_NAMES},
+                    "col": {"type": ["string", "null"]},
+                    "params": {"type": "object"},
+                    "reason": {"type": "string"},
+                },
+                "required": ["tool", "col", "params", "reason"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["steps"],
+    "additionalProperties": False,
+}
+
+SYSTEM_PROMPT = """\
+You are the planning module of YODA, a local data-cleaning agent. You receive a
+statistical PROFILE of a table (metadata only — you never see raw rows) and must
+propose a cleaning plan as JSON: {"steps": [...]}.
+
+Available tools (col = column to act on, null for whole-table tools):
+- drop_duplicates(col=null) — remove full-row duplicates. Use when duplicates.full_row > 0.
+- rename_columns(col=null) — snake_case all column names. If used, put it FIRST and
+  refer to columns by their snake_case names in later steps.
+- trim_whitespace(col) — strip/collapse whitespace, unicode NFC. Use for whitespace_issues.
+- normalize_dates(col) — mixed date formats -> ISO 8601. Use when date_formats_seen
+  has >1 format or a non-ISO format.
+- normalize_phone(col) — PH phone formats -> E.164. Use for phone_formats_seen chaos.
+- normalize_currency(col) — currency strings -> float + currency column. Use for
+  currency_like_values.
+- standardize_categories(col) — fold casing variants to canonical. Use for casing_variants.
+- fix_dtypes(col, params={"target": "numeric"|"bool"}) — coerce strings to numbers/bools.
+  Use for numeric_as_string / bool_as_string.
+- impute_missing(col, params={"strategy": "flag_only"}) — always use flag_only; never
+  silently fill values. Use when null_pct > 0.
+- flag_outliers(col, params={"method": "iqr"}) — adds a flag column. Use for iqr_outliers.
+- validate_rule(col, params with min/max/allowed) — only when an obvious domain rule exists.
+
+Rules: propose a step ONLY when the profile shows evidence for it. Do not invent
+columns. Do not clean what is not dirty — unnecessary changes are penalized.
+Each step needs a short "reason" citing the profile evidence."""
 
 
 class RuleBasedPlanner:
@@ -31,7 +92,7 @@ class RuleBasedPlanner:
                           "reason": f"{profile['duplicates']['full_row']} full-row duplicates"})
 
         for name, info in cols.items():
-            target = self._renamed(name) if any(
+            target = snake_case(name) if any(
                 i.get("non_snake_case_name") for i in cols.values()) else name
 
             if info.get("whitespace_issues") or info.get("non_nfc_values"):
@@ -79,18 +140,96 @@ class RuleBasedPlanner:
                               "reason": f"{info['iqr_outliers']} IQR outliers (flag, don't delete)"})
         return steps
 
-    @staticmethod
-    def _renamed(name: str) -> str:
-        s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(name))
-        s = re.sub(r"[^\w]+", "_", s)
-        return re.sub(r"_+", "_", s).strip("_").lower()
+
+def snake_case(name: str) -> str:
+    s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(name))
+    s = re.sub(r"[^\w]+", "_", s)
+    return re.sub(r"_+", "_", s).strip("_").lower()
+
+
+class PlanValidationError(ValueError):
+    pass
+
+
+def validate_plan(plan_obj: dict, profile: dict) -> list[dict]:
+    """Schema + semantic validation. Raises PlanValidationError with a
+    message suitable for feeding back to the model on retry."""
+    jsonschema.validate(plan_obj, PLAN_SCHEMA)
+    steps = plan_obj["steps"]
+    known = set(profile["columns"])
+    known |= {snake_case(c) for c in known}
+
+    for i, step in enumerate(steps):
+        tool, col = step["tool"], step["col"]
+        if tool in ("drop_duplicates", "rename_columns"):
+            continue
+        if col is None:
+            raise PlanValidationError(f"step {i}: tool '{tool}' requires a column")
+        if col not in known:
+            raise PlanValidationError(
+                f"step {i}: column '{col}' does not exist in the profile")
+        if tool == "impute_missing" and step["params"].get("strategy") not in (
+                None, "flag_only"):
+            raise PlanValidationError(
+                f"step {i}: impute_missing must use strategy 'flag_only'")
+    return steps
 
 
 class LLMPlanner:
-    """Ollama-backed planner. Implemented in Phase 2."""
+    """Ollama-backed planner: strict JSON, validated, retried, with fallback."""
 
-    def __init__(self, model: str = "qwen2.5:7b-instruct") -> None:
+    def __init__(self, model: str = "qwen3.5:4b",
+                 host: str = "http://localhost:11434",
+                 max_retries: int = 3, timeout: int = 300) -> None:
         self.model = model
+        self.host = host
+        self.max_retries = max_retries
+        self.timeout = timeout
+        self.last_outcome: dict = {}  # telemetry for reports/benchmark
+
+    def _chat(self, messages: list[dict]) -> str:
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "format": PLAN_SCHEMA,  # Ollama structured output
+            "options": {"temperature": 0.1},
+        }
+        req = urllib.request.Request(
+            f"{self.host}/api/chat",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            return json.loads(resp.read())["message"]["content"]
 
     def plan(self, profile: dict) -> list[dict]:
-        raise NotImplementedError("Phase 2")
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": "PROFILE:\n" + json.dumps(profile, indent=1)},
+        ]
+        errors: list[str] = []
+        for attempt in range(self.max_retries):
+            try:
+                raw = self._chat(messages)
+                plan_obj = json.loads(raw)
+                steps = validate_plan(plan_obj, profile)
+                self.last_outcome = {"source": "llm", "attempts": attempt + 1,
+                                     "errors": errors}
+                return steps
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                # Ollama unreachable — retrying won't help.
+                errors.append(f"ollama unreachable: {exc}")
+                break
+            except (json.JSONDecodeError, jsonschema.ValidationError,
+                    PlanValidationError, KeyError) as exc:
+                msg = f"{type(exc).__name__}: {exc}"
+                errors.append(msg)
+                messages.append({"role": "assistant", "content": raw})
+                messages.append({"role": "user", "content":
+                                 f"Your plan was invalid: {msg}\n"
+                                 "Return a corrected JSON plan."})
+        fallback = RuleBasedPlanner().plan(profile)
+        self.last_outcome = {"source": "fallback_rule_based",
+                             "attempts": self.max_retries, "errors": errors}
+        return fallback

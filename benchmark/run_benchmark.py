@@ -17,26 +17,30 @@ from benchmark.corruptor import corrupt
 from benchmark.datasets import DATASETS
 from benchmark.scorer import score
 from yoda.executor import execute
-from yoda.planner import RuleBasedPlanner
+from yoda.planner import LLMPlanner, RuleBasedPlanner
 from yoda.profiler import profile
 
 RESULTS_DIR = Path(__file__).parent / "results"
 
 
-def get_planner(name: str):
+def get_planner(name: str, model: str | None):
     if name == "rule_based":
         return RuleBasedPlanner()
-    raise SystemExit(f"unknown planner: {name} (LLM planners land in Phase 2)")
+    if name == "llm":
+        return LLMPlanner(model=model or "qwen3.5:4b")
+    raise SystemExit(f"unknown planner: {name}")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--planner", default="rule_based")
+    ap.add_argument("--model", default=None, help="Ollama model (llm planner)")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
-    planner = get_planner(args.planner)
-    out_dir = RESULTS_DIR / args.planner
+    planner = get_planner(args.planner, args.model)
+    label = args.model.replace(":", "_") if args.planner == "llm" else args.planner
+    out_dir = RESULTS_DIR / label
     out_dir.mkdir(parents=True, exist_ok=True)
 
     all_scores = []
@@ -47,6 +51,8 @@ def main() -> None:
         plan = planner.plan(prof)
         cleaned, _audit = execute(dirty, plan, audit_path=out_dir / f"{name}_audit.jsonl")
         result = score(clean, cleaned, manifest, plan)
+        if isinstance(planner, LLMPlanner):
+            result["planner_outcome"] = planner.last_outcome
         all_scores.append(result)
         (out_dir / f"{name}_score.json").write_text(
             json.dumps(result, indent=2), encoding="utf-8")
@@ -54,7 +60,7 @@ def main() -> None:
         print(f"{name:16s}  det {o['detection_rate']:.0%}  fix {o['fix_rate']:.0%}  "
               f"false-fix {o['false_fix_rate']:.2%}  ({o['n_errors']} errors)")
 
-    write_markdown(all_scores, out_dir / "results.md", args.planner)
+    write_markdown(all_scores, out_dir / "results.md", label)
     print(f"\nWrote {out_dir / 'results.md'}")
 
 

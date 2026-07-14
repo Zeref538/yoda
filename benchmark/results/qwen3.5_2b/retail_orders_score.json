@@ -1,0 +1,70 @@
+{
+  "dataset": "retail_orders",
+  "per_type": {
+    "category_casing": {
+      "n": 50,
+      "detected": 50,
+      "fixed": 50,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "dtype_corruption": {
+      "n": 50,
+      "detected": 0,
+      "fixed": 50,
+      "detection_rate": 0.0,
+      "fix_rate": 1.0
+    },
+    "duplicate": {
+      "n": 15,
+      "detected": 15,
+      "fixed": 15,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "mixed_date_format": {
+      "n": 50,
+      "detected": 50,
+      "fixed": 50,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "null": {
+      "n": 50,
+      "detected": 0,
+      "fixed": 0,
+      "detection_rate": 0.0,
+      "fix_rate": 0.0
+    },
+    "outlier": {
+      "n": 50,
+      "detected": 0,
+      "fixed": 0,
+      "detection_rate": 0.0,
+      "fix_rate": 0.0
+    },
+    "whitespace": {
+      "n": 50,
+      "detected": 50,
+      "fixed": 50,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    }
+  },
+  "overall": {
+    "n_errors": 315,
+    "detection_rate": 0.5238,
+    "fix_rate": 0.6825,
+    "false_fix_rate": 0.0,
+    "n_clean_cells_checked": 2705,
+    "n_false_fixes": 0
+  },
+  "planner_outcome": {
+    "source": "llm",
+    "attempts": 3,
+    "errors": [
+      "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+      "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+    ]
+  }
+}

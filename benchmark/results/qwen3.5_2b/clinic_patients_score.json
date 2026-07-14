@@ -1,0 +1,62 @@
+{
+  "dataset": "clinic_patients",
+  "per_type": {
+    "category_casing": {
+      "n": 35,
+      "detected": 35,
+      "fixed": 35,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "duplicate": {
+      "n": 10,
+      "detected": 10,
+      "fixed": 10,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "mixed_date_format": {
+      "n": 70,
+      "detected": 35,
+      "fixed": 35,
+      "detection_rate": 0.5,
+      "fix_rate": 0.5
+    },
+    "null": {
+      "n": 35,
+      "detected": 0,
+      "fixed": 0,
+      "detection_rate": 0.0,
+      "fix_rate": 0.0
+    },
+    "outlier": {
+      "n": 35,
+      "detected": 0,
+      "fixed": 0,
+      "detection_rate": 0.0,
+      "fix_rate": 0.0
+    },
+    "whitespace": {
+      "n": 35,
+      "detected": 35,
+      "fixed": 35,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    }
+  },
+  "overall": {
+    "n_errors": 220,
+    "detection_rate": 0.5227,
+    "fix_rate": 0.5227,
+    "false_fix_rate": 0.0,
+    "n_clean_cells_checked": 1895,
+    "n_false_fixes": 0
+  },
+  "planner_outcome": {
+    "source": "llm",
+    "attempts": 2,
+    "errors": [
+      "PlanValidationError: step 3: column 'birth_date, last_visit' does not exist in the profile"
+    ]
+  }
+}

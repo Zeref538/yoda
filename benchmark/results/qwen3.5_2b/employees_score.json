@@ -1,0 +1,60 @@
+{
+  "dataset": "employees",
+  "per_type": {
+    "category_casing": {
+      "n": 60,
+      "detected": 30,
+      "fixed": 30,
+      "detection_rate": 0.5,
+      "fix_rate": 0.5
+    },
+    "dtype_corruption": {
+      "n": 30,
+      "detected": 0,
+      "fixed": 21,
+      "detection_rate": 0.0,
+      "fix_rate": 0.7
+    },
+    "duplicate": {
+      "n": 8,
+      "detected": 8,
+      "fixed": 8,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "mixed_date_format": {
+      "n": 30,
+      "detected": 30,
+      "fixed": 30,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "null": {
+      "n": 30,
+      "detected": 0,
+      "fixed": 0,
+      "detection_rate": 0.0,
+      "fix_rate": 0.0
+    },
+    "outlier": {
+      "n": 30,
+      "detected": 0,
+      "fixed": 0,
+      "detection_rate": 0.0,
+      "fix_rate": 0.0
+    }
+  },
+  "overall": {
+    "n_errors": 188,
+    "detection_rate": 0.3617,
+    "fix_rate": 0.4734,
+    "false_fix_rate": 0.0,
+    "n_clean_cells_checked": 1633,
+    "n_false_fixes": 0
+  },
+  "planner_outcome": {
+    "source": "llm",
+    "attempts": 1,
+    "errors": []
+  }
+}
