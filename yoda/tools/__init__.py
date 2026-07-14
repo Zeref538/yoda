@@ -1,8 +1,262 @@
-"""The agent's toolbox: each cleaning tool is a pure function with unit tests.
+"""YODA's cleaning toolbox: pure pandas functions, no AI.
 
-Planned tools (see CLAUDE.md): drop_duplicates, normalize_dates,
-normalize_phone, normalize_currency, standardize_categories, fix_dtypes,
-impute_missing, flag_outliers, trim_whitespace, validate_rule, rename_columns.
+Each tool takes (df, col, params) and returns (new_df, stats) where stats
+is a JSON-safe dict with at least ``rows_affected``. Tools never mutate the
+input dataframe. Destructive ops are recoverable because the executor keeps
+the original df and logs exact diff counts.
 """
 
-TOOL_REGISTRY: dict = {}
+from __future__ import annotations
+
+import re
+import unicodedata
+
+import pandas as pd
+from dateutil import parser as dateparser
+
+TOOLS: dict = {}
+
+
+def _tool(fn):
+    TOOLS[fn.__name__] = fn
+    return fn
+
+
+@_tool
+def drop_duplicates(df: pd.DataFrame, col: str | None = None, params: dict | None = None):
+    params = params or {}
+    subset = params.get("subset") or ([col] if col else None)
+    out = df.drop_duplicates(subset=subset, keep="first").reset_index(drop=True)
+    return out, {"rows_affected": len(df) - len(out)}
+
+
+@_tool
+def normalize_dates(df: pd.DataFrame, col: str, params: dict | None = None):
+    params = params or {}
+    dayfirst = bool(params.get("dayfirst", False))
+    out = df.copy()
+    n_changed = n_failed = 0
+
+    def conv(v):
+        nonlocal n_changed, n_failed
+        if pd.isna(v):
+            return v
+        s = str(v).strip()
+        try:
+            if re.fullmatch(r"\d{8}", s):
+                d = pd.Timestamp(s[:4] + "-" + s[4:6] + "-" + s[6:])
+            else:
+                d = dateparser.parse(s, dayfirst=dayfirst)
+            iso = d.strftime("%Y-%m-%d")
+            if iso != s:
+                n_changed += 1
+            return iso
+        except (ValueError, OverflowError):
+            n_failed += 1
+            return v
+
+    out[col] = out[col].map(conv)
+    return out, {"rows_affected": n_changed, "parse_failures": n_failed}
+
+
+@_tool
+def normalize_phone(df: pd.DataFrame, col: str, params: dict | None = None):
+    """PH-aware: 0917... / +63917... / 63-917-... -> E.164 (+639XXXXXXXXX)."""
+    out = df.copy()
+    n_changed = n_failed = 0
+
+    def conv(v):
+        nonlocal n_changed, n_failed
+        if pd.isna(v):
+            return v
+        s = str(v)
+        digits = re.sub(r"\D", "", s)
+        if digits.startswith("09") and len(digits) == 11:
+            e164 = "+63" + digits[1:]
+        elif digits.startswith("639") and len(digits) == 12:
+            e164 = "+" + digits
+        elif digits.startswith("9") and len(digits) == 10:
+            e164 = "+63" + digits
+        else:
+            n_failed += 1
+            return v
+        if e164 != s:
+            n_changed += 1
+        return e164
+
+    out[col] = out[col].map(conv)
+    return out, {"rows_affected": n_changed, "parse_failures": n_failed}
+
+
+@_tool
+def normalize_currency(df: pd.DataFrame, col: str, params: dict | None = None):
+    """'₱1,200.00' / 'PHP 1200' / '1200' -> float, plus a <col>_currency column."""
+    out = df.copy()
+    n_changed = n_failed = 0
+    currencies = []
+
+    def conv(v):
+        nonlocal n_changed, n_failed
+        if pd.isna(v):
+            currencies.append(None)
+            return v
+        s = str(v).strip()
+        m = re.match(r"^(₱|PHP|Php|php|\$|USD)?\s*(-?[\d,]+(?:\.\d+)?)$", s)
+        if not m:
+            n_failed += 1
+            currencies.append(None)
+            return v
+        sym = m.group(1)
+        currencies.append({"₱": "PHP", "$": "USD"}.get(sym, sym.upper() if sym else "PHP"))
+        n_changed += 1
+        return float(m.group(2).replace(",", ""))
+
+    out[col] = out[col].map(conv)
+    out[f"{col}_currency"] = currencies
+    out[col] = pd.to_numeric(out[col], errors="coerce")
+    return out, {"rows_affected": n_changed, "parse_failures": n_failed}
+
+
+@_tool
+def standardize_categories(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Apply a value mapping. If none given, fold case/whitespace to the
+    most frequent variant of each group (deterministic fallback)."""
+    params = params or {}
+    mapping: dict = dict(params.get("mapping") or {})
+    out = df.copy()
+    s = out[col].astype("string")
+    if not mapping:
+        folded = s.str.strip().str.lower()
+        for key in folded.dropna().unique():
+            variants = s[folded == key]
+            canonical = variants.mode().iloc[0].strip()
+            for v in variants.unique():
+                if v != canonical:
+                    mapping[v] = canonical
+    n = int(s.isin(mapping.keys()).sum())
+    out[col] = s.map(lambda v: mapping.get(v, v))
+    return out, {"rows_affected": n, "mapping_size": len(mapping)}
+
+
+@_tool
+def fix_dtypes(df: pd.DataFrame, col: str, params: dict | None = None):
+    params = params or {}
+    target = params.get("target", "numeric")
+    out = df.copy()
+    s = out[col]
+    if target == "numeric":
+        cleaned = s.astype(str).str.replace(",", "", regex=False).str.strip()
+        converted = pd.to_numeric(cleaned, errors="coerce")
+        n_failed = int((converted.isna() & s.notna()).sum())
+        n_changed = int((converted.notna() & s.notna()).sum())
+        out[col] = converted.where(s.notna(), other=pd.NA)
+    elif target == "bool":
+        truthy = {"true": True, "yes": True, "y": True, "t": True, "1": True,
+                  "false": False, "no": False, "n": False, "f": False, "0": False}
+        low = s.astype(str).str.strip().str.lower()
+        converted = low.map(truthy)
+        n_failed = int((converted.isna() & s.notna()).sum())
+        n_changed = int(converted.notna().sum())
+        out[col] = converted.where(s.notna(), other=pd.NA)
+    else:
+        raise ValueError(f"unknown dtype target: {target}")
+    return out, {"rows_affected": n_changed, "coercion_failures": n_failed}
+
+
+@_tool
+def impute_missing(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Strategies: mean / median / mode / constant / flag_only. Never a
+    silent default — flag_only just adds <col>_missing without touching data."""
+    params = params or {}
+    strategy = params.get("strategy", "flag_only")
+    out = df.copy()
+    n_null = int(out[col].isna().sum())
+    if strategy == "flag_only":
+        out[f"{col}_missing"] = out[col].isna()
+        return out, {"rows_affected": n_null, "strategy": strategy}
+    if strategy == "mean":
+        fill = out[col].mean()
+    elif strategy == "median":
+        fill = out[col].median()
+    elif strategy == "mode":
+        fill = out[col].mode().iloc[0] if not out[col].mode().empty else None
+    elif strategy == "constant":
+        fill = params.get("value")
+    else:
+        raise ValueError(f"unknown impute strategy: {strategy}")
+    out[f"{col}_missing"] = out[col].isna()
+    out[col] = out[col].fillna(fill)
+    return out, {"rows_affected": n_null, "strategy": strategy, "fill_value": str(fill)}
+
+
+@_tool
+def flag_outliers(df: pd.DataFrame, col: str, params: dict | None = None):
+    """IQR or z-score -> adds <col>_outlier bool column. Flags, never deletes."""
+    params = params or {}
+    method = params.get("method", "iqr")
+    out = df.copy()
+    s = pd.to_numeric(out[col], errors="coerce")
+    if method == "iqr":
+        q1, q3 = s.quantile(0.25), s.quantile(0.75)
+        iqr = q3 - q1
+        mask = (s < q1 - 1.5 * iqr) | (s > q3 + 1.5 * iqr)
+    elif method == "zscore":
+        z = (s - s.mean()) / s.std()
+        mask = z.abs() > float(params.get("threshold", 3.0))
+    else:
+        raise ValueError(f"unknown outlier method: {method}")
+    mask = mask.fillna(False)
+    out[f"{col}_outlier"] = mask
+    return out, {"rows_affected": int(mask.sum()), "method": method}
+
+
+@_tool
+def trim_whitespace(df: pd.DataFrame, col: str, params: dict | None = None):
+    out = df.copy()
+    s = out[col].astype("string")
+
+    def conv(v):
+        if pd.isna(v):
+            return v
+        return unicodedata.normalize("NFC", re.sub(r"\s+", " ", str(v)).strip())
+
+    new = s.map(conv)
+    n = int((new != s).fillna(False).sum())
+    out[col] = new
+    return out, {"rows_affected": n}
+
+
+@_tool
+def validate_rule(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Declarative range/set check -> adds <col>_invalid flag column."""
+    params = params or {}
+    out = df.copy()
+    s = out[col]
+    invalid = pd.Series(False, index=out.index)
+    if "min" in params:
+        invalid |= pd.to_numeric(s, errors="coerce") < params["min"]
+    if "max" in params:
+        invalid |= pd.to_numeric(s, errors="coerce") > params["max"]
+    if "allowed" in params:
+        invalid |= ~s.isin(params["allowed"]) & s.notna()
+    out[f"{col}_invalid"] = invalid.fillna(False)
+    return out, {"rows_affected": int(invalid.sum())}
+
+
+@_tool
+def rename_columns(df: pd.DataFrame, col: str | None = None, params: dict | None = None):
+    """snake_case all column names (or apply an explicit mapping)."""
+    params = params or {}
+    mapping = params.get("mapping")
+    if not mapping:
+        def snake(name: str) -> str:
+            s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(name))
+            s = re.sub(r"[^\w]+", "_", s)
+            return re.sub(r"_+", "_", s).strip("_").lower()
+        mapping = {c: snake(c) for c in df.columns if snake(c) != c}
+    out = df.rename(columns=mapping)
+    return out, {"rows_affected": 0, "columns_renamed": len(mapping)}
+
+
+# Back-compat alias used by the Phase 0 scaffold.
+TOOL_REGISTRY = TOOLS

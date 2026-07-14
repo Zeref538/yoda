@@ -1,0 +1,55 @@
+{
+  "dataset": "clinic_patients",
+  "per_type": {
+    "category_casing": {
+      "n": 35,
+      "detected": 35,
+      "fixed": 35,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "duplicate": {
+      "n": 10,
+      "detected": 10,
+      "fixed": 10,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "mixed_date_format": {
+      "n": 70,
+      "detected": 70,
+      "fixed": 70,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "null": {
+      "n": 35,
+      "detected": 35,
+      "fixed": 35,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "outlier": {
+      "n": 35,
+      "detected": 35,
+      "fixed": 30,
+      "detection_rate": 1.0,
+      "fix_rate": 0.8571
+    },
+    "whitespace": {
+      "n": 35,
+      "detected": 35,
+      "fixed": 35,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    }
+  },
+  "overall": {
+    "n_errors": 220,
+    "detection_rate": 1.0,
+    "fix_rate": 0.9773,
+    "false_fix_rate": 0.0,
+    "n_clean_cells_checked": 1895,
+    "n_false_fixes": 0
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "dataset": "inventory",
+  "per_type": {
+    "category_casing": {
+      "n": 45,
+      "detected": 45,
+      "fixed": 45,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "dtype_corruption": {
+      "n": 45,
+      "detected": 45,
+      "fixed": 45,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "duplicate": {
+      "n": 14,
+      "detected": 14,
+      "fixed": 14,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "mixed_date_format": {
+      "n": 45,
+      "detected": 45,
+      "fixed": 45,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "null": {
+      "n": 45,
+      "detected": 45,
+      "fixed": 45,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "outlier": {
+      "n": 45,
+      "detected": 45,
+      "fixed": 41,
+      "detection_rate": 1.0,
+      "fix_rate": 0.9111
+    },
+    "whitespace": {
+      "n": 45,
+      "detected": 45,
+      "fixed": 45,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    }
+  },
+  "overall": {
+    "n_errors": 284,
+    "detection_rate": 1.0,
+    "fix_rate": 0.9859,
+    "false_fix_rate": 0.0,
+    "n_clean_cells_checked": 2434,
+    "n_false_fixes": 0
+  }
+}
