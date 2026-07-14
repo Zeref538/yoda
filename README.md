@@ -1,7 +1,7 @@
-# Linis 🧹 — privacy-first, fully local data-cleaning agent
+# YODA 🧹 — Your Offline Data Agent
 
-> An agentic AI that cleans messy tabular data where **the LLM never sees a
-> single raw row** and **nothing leaves your machine**. The demo runs with
+> A privacy-first, fully local data-cleaning agent. The LLM never sees a
+> single raw row and **nothing leaves your machine**. The demo runs with
 > Wi-Fi off.
 
 **Status: in development** — see `CLAUDE.md` for the full build spec and phase plan.
@@ -20,6 +20,10 @@ AI plans. Deterministic code executes.
 5. **Verifier** re-profiles and confirms the issues are actually resolved.
 
 The LLM cannot corrupt or leak your data — it never touches it.
+
+```bash
+yoda clean data.csv
+```
 
 ## Honest evaluation (coming with Phase 2)
 

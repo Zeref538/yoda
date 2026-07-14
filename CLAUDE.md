@@ -1,6 +1,6 @@
-# Linis — privacy-first, fully local data-cleaning agent
+# YODA — Your Offline Data Agent
 
-> "Linis" = Tagalog for *clean*. An agentic AI that cleans messy tabular data
+> Privacy-first, fully local data-cleaning agent. An agentic AI that cleans messy tabular data
 > (CSV / Excel / SQLite) where **the LLM never sees a single raw row** and
 > **nothing ever leaves the machine**. Demo runs with Wi-Fi off.
 
@@ -11,7 +11,7 @@ impresses both AI-engineer and data-analyst recruiters.
 ## The pitch (memorize this)
 
 Every company wants AI on their data; almost none want their data leaving the
-building. Linis solves data cleaning — 60–80% of every data job — with an agent
+building. YODA solves data cleaning — 60–80% of every data job — with an agent
 architecture where:
 
 1. **Everything runs locally** (Ollama, small open model — no API, no internet).
@@ -96,7 +96,8 @@ PII fixture.
   configurable via `--model`. Document RAM needs. Use Ollama's
   `format: "json"` / structured output.
 - **Data**: pandas. **CLI**: `typer` + `rich` (pretty plan tables, diffs).
-- Package as `linis` with `pyproject.toml`; entry point `linis clean data.csv`.
+- Package as `yoda` with `pyproject.toml` (distribution name `yoda-agent` to
+  avoid PyPI collisions); entry point `yoda clean data.csv`.
 - Tests: pytest. CI: GitHub Actions (lint + unit tests; benchmark runs locally
   since CI has no GPU/Ollama — but include a mocked-LLM test of the full loop).
 
@@ -127,7 +128,7 @@ executor keeps original df; report shows exact diff counts.
    mixed date formats, category casing chaos, nulls, dtype corruption, outliers,
    whitespace, phone-format chaos. Emit `corruption_manifest.json` (ground truth:
    every injected error, its type, location).
-3. Scorer compares Linis output vs manifest and reports per error type:
+3. Scorer compares YODA output vs manifest and reports per error type:
    - **detection rate** (found in plan)
    - **fix rate** (correctly repaired)
    - **false-fix rate** (changed something that wasn't corrupted)
@@ -146,7 +147,7 @@ executor keeps original df; report shows exact diff counts.
 5. **Failure-analysis section in README**: where the 7B model failed, how schema
    constraints fixed it (recruiters love this more than the successes).
 6. `--dry-run` mode (plan + report, touch nothing).
-7. SQLite support (`linis clean db.sqlite --table customers`) — "works on databases,
+7. SQLite support (`yoda clean db.sqlite --table customers`) — "works on databases,
    not just CSVs" matches John's original idea.
 8. Optional (Phase 5, only if John wants): tiny local web UI (FastAPI + React)
    showing profile → plan → diff visually, for the demo video.
@@ -155,7 +156,7 @@ executor keeps original df; report shows exact diff counts.
 ## Phases (gate after each)
 
 - **Phase 0 — scaffold**: repo init, pyproject, package layout
-  (`linis/{profiler,redactor,planner,executor,verifier,tools,report}.py`),
+  (`yoda/{profiler,redactor,planner,executor,verifier,tools,report}.py`),
   CI, this file. Gate: John says go.
 - **Phase 1 — truth first**: profiler + redactor + corruptor + scorer +
   rule-based baseline planner (no LLM). Gate: baseline benchmark table.
@@ -170,7 +171,7 @@ executor keeps original df; report shows exact diff counts.
 
 ## Portfolio card (draft for later)
 
-- Title: **Linis** · tags: `Python, Agentic AI, Ollama, Pandas, Privacy`
+- Title: **YODA — Your Offline Data Agent** · tags: `Python, Agentic AI, Ollama, Pandas, Privacy`
 - Metric: whatever the honest headline is, e.g. "94% fix rate, 1.8% false-fix, 100% local"
 - Description: "Privacy-first data-cleaning agent — a local LLM plans repairs
   from metadata only (raw rows never reach the model), deterministic pandas
