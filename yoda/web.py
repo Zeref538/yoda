@@ -71,9 +71,11 @@ def _issues(prof: dict) -> list[dict]:
 
 
 def _grid(df: pd.DataFrame, changed: dict[str, list] | None = None,
-          new_cols: list[str] | None = None, removed: list | None = None) -> dict:
+          new_cols: list[str] | None = None, removed: list | None = None,
+          before_vals: dict | None = None) -> dict:
     """Grid payload: columns, up to GRID_MAX_ROWS rows keyed by row id,
-    plus diff decorations (changed cells / new columns / removed row ids)."""
+    plus diff decorations (changed cells with their previous values / new
+    columns / removed row ids)."""
     view = df.head(GRID_MAX_ROWS)
     rows = []
     for rid, row in view.iterrows():
@@ -85,17 +87,19 @@ def _grid(df: pd.DataFrame, changed: dict[str, list] | None = None,
         "n_total_rows": len(df),
         "truncated": len(df) > GRID_MAX_ROWS,
         "changed": changed or {},          # {col: [rids]}
+        "before": before_vals or {},       # {col: {rid: old value}}
         "new_cols": new_cols or [],
         "removed_rids": [int(r) for r in (removed or [])],
     }
 
 
-def _diff(before: pd.DataFrame, after: pd.DataFrame) -> tuple[dict, list, list]:
+def _diff(before: pd.DataFrame, after: pd.DataFrame) -> tuple[dict, list, list, dict]:
     """Cell-level diff aligned on the (preserved) index."""
     shared_rids = before.index.intersection(after.index)
     removed = list(before.index.difference(after.index))
     new_cols = [str(c) for c in after.columns if c not in before.columns]
     changed: dict[str, list] = {}
+    before_vals: dict[str, dict] = {}
     for col in before.columns:
         if col not in after.columns:
             continue
@@ -105,7 +109,10 @@ def _diff(before: pd.DataFrame, after: pd.DataFrame) -> tuple[dict, list, list]:
         rids = [int(r) for r in shared_rids[mask]]
         if rids:
             changed[str(col)] = rids
-    return changed, new_cols, removed
+            before_vals[str(col)] = {
+                str(r): ("" if pd.isna(b[r]) else str(b[r]))
+                for r in rids if r < GRID_MAX_ROWS}
+    return changed, new_cols, removed, before_vals
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -194,7 +201,7 @@ def run(body: dict):
         raise HTTPException(400, f"invalid plan: {exc}")
 
     cleaned, audit = execute(source, steps)
-    changed, new_cols, removed = _diff(source, cleaned)
+    changed, new_cols, removed, before_vals = _diff(source, cleaned)
     S["cleaned"] = cleaned
     S["rounds"].append({"plan": steps, "audit": audit})
 
@@ -210,7 +217,7 @@ def run(body: dict):
         "followup": followup,
         "round": len(S["rounds"]),
         "n_rows_before": len(S["df"]), "n_rows_after": len(cleaned),
-        "grid": _grid(cleaned, changed, new_cols, removed),
+        "grid": _grid(cleaned, changed, new_cols, removed, before_vals),
         "undo_depth": len(S["timeline"]) - 1,
     }
 
@@ -324,7 +331,9 @@ def edit(body: dict):
 
     S["cleaned"] = out
     _snapshot(label, "manual")
-    return {"grid": _grid(out, changed, [], removed),
+    before_vals = {c: {str(r): ("" if pd.isna(df.at[r, c]) else str(df.at[r, c]))
+                       for r in rids} for c, rids in changed.items()}
+    return {"grid": _grid(out, changed, [], removed, before_vals),
             "n_rows": len(out), "undo_depth": len(S["timeline"]) - 1}
 
 
@@ -393,6 +402,66 @@ def restore_version(body: dict):
     _snapshot(f"restored version: {body['name']}", "revert")
     return {"grid": _grid(S["cleaned"]), "n_rows": len(S["cleaned"]),
             "undo_depth": len(S["timeline"]) - 1}
+
+
+@app.get("/api/colstats")
+def colstats(col: str):
+    """Stats for the sidebar: nulls, uniques, numeric summary or top values."""
+    if S.get("cleaned") is None:
+        raise HTTPException(400, "upload a file first")
+    df = S["cleaned"]
+    if col not in df.columns:
+        raise HTTPException(400, f"unknown column: {col}")
+    s = df[col]
+    non_null = s.dropna()
+    out: dict = {"col": col, "n": len(s), "nulls": int(s.isna().sum()),
+                 "unique": int(non_null.nunique()), "dtype": str(s.dtype)}
+    numeric = pd.to_numeric(non_null, errors="coerce").dropna() \
+        if not pd.api.types.is_bool_dtype(s) else pd.Series(dtype=float)
+    if len(numeric) >= max(1, int(0.9 * len(non_null))) and len(numeric):
+        out["numeric"] = {"min": float(numeric.min()), "max": float(numeric.max()),
+                          "mean": round(float(numeric.mean()), 4)}
+        binned = pd.cut(numeric, bins=10, duplicates="drop").value_counts(sort=False)
+        out["histogram"] = [{"label": f"{iv.left:g}–{iv.right:g}", "n": int(n)}
+                            for iv, n in binned.items()]
+    else:
+        vc = non_null.astype(str).value_counts().head(8)
+        out["top_values"] = [{"value": v, "n": int(n)} for v, n in vc.items()]
+    return out
+
+
+@app.get("/api/download_xlsx")
+def download_xlsx():
+    """Excel bundle: cleaned data + audit trail + verification, one file."""
+    if S.get("cleaned") is None:
+        raise HTTPException(400, "upload a file first")
+    out = Path(tempfile.gettempdir()) / (Path(S["name"]).stem + "_yoda.xlsx")
+    audit_rows = [{"round": ri + 1, **{k: json.dumps(v, default=str)
+                                       if isinstance(v, (dict, list)) else v
+                                       for k, v in e.items()}}
+                  for ri, r in enumerate(S.get("rounds", [])) for e in r["audit"]]
+    with pd.ExcelWriter(out, engine="openpyxl") as xw:
+        S["cleaned"].to_excel(xw, sheet_name="cleaned_data", index=False)
+        (pd.DataFrame(audit_rows) if audit_rows
+         else pd.DataFrame([{"note": "no steps executed"}])
+         ).to_excel(xw, sheet_name="audit_log", index=False)
+        (pd.DataFrame(S.get("verdicts") or [{"note": "no verification yet"}])
+         ).to_excel(xw, sheet_name="verification", index=False)
+    return FileResponse(out, filename=out.name,
+                        media_type="application/vnd.openxmlformats-officedocument"
+                                   ".spreadsheetml.sheet")
+
+
+@app.get("/api/recipe")
+def get_recipe():
+    """All non-manual steps applied this session, as a downloadable recipe."""
+    steps = [s for r in S.get("rounds", []) if not r.get("manual")
+             for s in r["plan"]]
+    if not steps:
+        raise HTTPException(400, "no applied AI/tool steps to save yet")
+    return {"yoda_recipe": 1, "source": S.get("name"),
+            "created": pd.Timestamp.now().isoformat(timespec="seconds"),
+            "steps": steps}
 
 
 @app.get("/api/report")

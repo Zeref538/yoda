@@ -116,15 +116,24 @@ yoda clean db.sqlite --table customers   # works on databases too
 yoda clean data.csv --planner rule_based # no-AI baseline mode
 yoda profile data.csv                    # print exactly what the LLM would see
 yoda web                                 # local web UI at http://127.0.0.1:8000
+
+# recipes: teach it once, replay forever
+yoda clean data.csv --save-recipe weekly.json   # save the approved plan
+yoda clean next_week.csv --recipe weekly.json   # replay it (pre-approved)
+yoda watch ./inbox --recipe weekly.json         # auto-clean a drop folder;
+                                                # failures are quarantined
 ```
 
 ### Local web UI
 
-`pip install -e ".[web]"` then `yoda web` — a dark-mode, single-page UI
-(FastAPI + vanilla JS, zero CDNs, works with Wi-Fi off) that walks the same
-flow visually: upload → profiled issues → plan approval with per-step
-checkboxes → executed-steps audit → verification verdicts → report. The
-server binds to `127.0.0.1` only; it is a local tool, never a service.
+`pip install -e ".[web]"` then `yoda web` — a dark-mode, spreadsheet-style UI
+(FastAPI + vanilla JS, zero CDNs, works with Wi-Fi off). Click a column and
+tell the AI what to do with it in plain language; approve its suggested fixes;
+changed cells turn green (hover shows the old value), new columns cyan.
+Excel-like editing (drag-select, edit/delete cells, rows and columns), full
+history timeline with revert-to-original, named versions, per-column stats,
+recipes (save/apply), and one-file Excel export (data + audit + verification).
+The server binds to `127.0.0.1` only; it is a local tool, never a service.
 
 Outputs land next to your file: `<name>_cleaned.<ext>`, `<name>_audit.jsonl`,
 `<name>_report.md`. Originals are never modified.

@@ -184,6 +184,18 @@
   .notebox{color:var(--text-muted);font-size:.75rem;border-left:2px solid var(--accent);
         padding:.3rem .7rem;background:var(--accent-dim);border-radius:0 6px 6px 0}
 
+  /* ---------- column stats bars ---------- */
+  .stat-chips{display:flex;gap:.4rem;flex-wrap:wrap;font-family:var(--mono);font-size:.7rem}
+  .stat-chips span{border:1px solid var(--border);border-radius:6px;
+        padding:.1rem .5rem;color:var(--text-muted);background:var(--surface-2)}
+  .bar-row{display:grid;grid-template-columns:minmax(4rem,40%) 1fr 2.5rem;
+        gap:.5rem;align-items:center;font-size:.7rem;font-family:var(--mono)}
+  .bar-row .lbl{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;
+        white-space:nowrap;text-align:right}
+  .bar-row .track{background:var(--surface-2);border-radius:3px;height:.7rem}
+  .bar-row .fill{background:var(--accent);opacity:.75;height:100%;border-radius:3px}
+  .bar-row .n{color:var(--text-muted);text-align:right}
+
   /* ---------- context menu ---------- */
   .ctx{position:fixed;z-index:120;min-width:15rem;background:var(--surface-2);
        border:1px solid var(--border);border-radius:10px;padding:.35rem;
@@ -232,8 +244,12 @@
   <button id="btn-undo" class="ghost hidden" title="Undo last change (Ctrl+Z)">Undo</button>
   <button id="btn-history" class="ghost hidden" title="Timeline and saved versions">History</button>
   <button id="btn-clean-all" class="primary hidden">Clean everything</button>
+  <button id="btn-recipe" class="ghost hidden" title="Save or apply a cleaning recipe">Recipe</button>
   <button id="btn-report" class="ghost hidden">Report</button>
-  <a id="dl" href="/api/download" download class="hidden"><button class="ghost">Download CSV</button></a>
+  <a id="dl" href="/api/download" download class="hidden"><button class="ghost">CSV</button></a>
+  <a id="dlx" href="/api/download_xlsx" download class="hidden">
+    <button class="ghost" title="Excel: cleaned data + audit log + verification">Excel</button></a>
+  <input type="file" id="recipe-file" accept=".json" hidden>
   <button id="btn-new" class="ghost hidden" title="Start over with a new file">New file</button>
 </header>
 
@@ -349,7 +365,8 @@ async function upload(file){
     state.grid = d.grid; state.issues = d.issues; state.rounds = 0;
     state.verdicts = []; state.followup = []; state.suggestions = [];
     $("#filechip").textContent = `${d.name} · ${d.n_rows}×${d.n_cols}`;
-    ["#filechip","#btn-clean-all","#btn-new","#btn-history"].forEach(s=>$(s).classList.remove("hidden"));
+    ["#filechip","#btn-clean-all","#btn-new","#btn-history","#btn-recipe"]
+      .forEach(s=>$(s).classList.remove("hidden"));
     $("#btn-undo").classList.add("hidden");
     $("#empty").classList.add("hidden"); $("#grid").classList.remove("hidden");
     document.querySelectorAll(".legend").forEach(el=>el.classList.remove("hidden"));
@@ -379,9 +396,11 @@ function renderGrid(){
     html += `<tr data-r="${ri}" data-rid="${r.rid}"><td class="rownum">${r.rid+1}</td>`;
     r.cells.forEach((v,ci)=>{
       const col = g.columns[ci];
-      const cls = newCols.has(col) ? "newcell"
-        : (changed[col]||[]).includes(r.rid) ? "changed" : "";
-      html += `<td class="${cls}" data-c="${ci}" title="${esc(v)}">${esc(v)}</td>`;
+      const isChanged = (changed[col]||[]).includes(r.rid);
+      const cls = newCols.has(col) ? "newcell" : isChanged ? "changed" : "";
+      const was = isChanged ? (g.before?.[col]?.[String(r.rid)]) : undefined;
+      const tip = was!==undefined ? `was: ${was||"(empty)"}` : v;
+      html += `<td class="${cls}" data-c="${ci}" title="${esc(tip)}">${esc(v)}</td>`;
     });
     html += "</tr>";
   });
@@ -589,7 +608,9 @@ function renderDrawer(wholeTable=false){
   $("#drawer-title").textContent = wholeTable||!col ? "whole table" : col;
   const body = $("#drawer-body");
   const issues = col ? state.issues.filter(i=>i.col===col) : state.issues;
-  let html = `<div class="panel-label">detected issues</div>`;
+  let html = col ? `<div class="panel-label">column stats</div><div id="colstats"
+      style="display:flex;flex-direction:column;gap:.45rem"></div>` : "";
+  html += `<div class="panel-label">detected issues</div>`;
   html += issues.length
     ? issues.map(i=>`<div class="issue-line"><span>${esc(i.issue)}${!col&&i.col?` <span class="mono" style="color:var(--accent-2)">${esc(i.col)}</span>`:""}</span><span class="n">${esc(String(i.count))}</span></div>`).join("")
     : `<div class="issue-line"><span>nothing suspicious found</span><span class="n">0</span></div>`;
@@ -617,7 +638,32 @@ function renderDrawer(wholeTable=false){
   $("#instruction").addEventListener("keydown", e=>{
     if((e.ctrlKey||e.metaKey) && e.key==="Enter"){ e.preventDefault(); suggest(col); }
   });
+  if(col) loadColStats(col);
   renderVerdicts();
+}
+
+/* ---------- column stats ---------- */
+async function loadColStats(col){
+  try{
+    const d = await (await api("/api/colstats?col="+encodeURIComponent(col))).json();
+    const box = $("#colstats"); if(!box) return;
+    let html = `<div class="stat-chips">
+      <span>${esc(d.dtype)}</span><span>${d.n} rows</span>
+      <span>${d.unique} unique</span>
+      <span style="${d.nulls?'color:var(--warn)':''}">${d.nulls} nulls</span>`;
+    if(d.numeric) html += `<span>min ${d.numeric.min}</span>
+      <span>mean ${d.numeric.mean}</span><span>max ${d.numeric.max}</span>`;
+    html += `</div>`;
+    const bars = d.histogram || d.top_values;
+    if(bars && bars.length){
+      const max = Math.max(...bars.map(b=>b.n));
+      html += bars.map(b=>`<div class="bar-row">
+        <span class="lbl" title="${esc(b.label??b.value)}">${esc(b.label??b.value)}</span>
+        <span class="track"><span class="fill" style="width:${Math.max(2,100*b.n/max)}%"></span></span>
+        <span class="n">${b.n}</span></div>`).join("");
+    }
+    box.innerHTML = html;
+  }catch(e){ /* stats are decorative — stay quiet */ }
 }
 
 /* ---------- suggest (with action words) ---------- */
@@ -712,6 +758,12 @@ async function applyApproved(){
     const d = await (await api("/api/execute",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({steps})})).json();
+    handleExecuted(d, steps.length);
+  }catch(e){ $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  state.busy = false;
+}
+
+function handleExecuted(d, nSteps){
     state.grid = d.grid; state.rounds = d.round;
     state.verdicts = d.verdicts; state.followup = d.followup;
     // refresh issue badges from surviving verdicts
@@ -726,17 +778,16 @@ async function applyApproved(){
       `round ${d.round} — ${changed} cells changed, ${removed} duplicate rows removed, `+
       `${d.n_rows_after} rows remain`;
     $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows_after+"×");
-    ["#btn-report","#dl"].forEach(s=>$(s).classList.remove("hidden"));
+    ["#btn-report","#dl","#dlx","#btn-recipe"].forEach(s=>$(s).classList.remove("hidden"));
     $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
-    toast(`Applied ${steps.length} step(s) — ${changed} cells changed`);
+    toast(`Applied ${nSteps} step(s) — ${changed} cells changed`);
     state.suggestions = d.followup || [];
     const box = $("#sugg-box");
-    if(state.suggestions.length){
-      renderSuggestions("verifier follow-up — issues survived");
-    } else { box.innerHTML = ""; }
+    if(box){
+      if(state.suggestions.length) renderSuggestions("verifier follow-up — issues survived");
+      else box.innerHTML = "";
+    }
     renderVerdicts();
-  }catch(e){ $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
-  state.busy = false;
 }
 
 function renderVerdicts(){
@@ -852,6 +903,50 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   showCtx(e.clientX, e.clientY, col || null);
 });
 
+/* ---------- recipes ---------- */
+$("#btn-recipe").addEventListener("click", e=>{
+  const r = e.target.getBoundingClientRect();
+  closeCtx();
+  ctxEl = document.createElement("div");
+  ctxEl.className = "ctx"; ctxEl.setAttribute("role","menu");
+  ctxEl.innerHTML = `<div class="head">recipes — teach once, replay forever</div>
+    <button class="item" data-r="save">Save applied steps as recipe (.json)</button>
+    <button class="item" data-r="apply">Apply a recipe to this file&hellip;</button>`;
+  document.body.appendChild(ctxEl);
+  ctxEl.style.left = Math.min(r.left, innerWidth-ctxEl.offsetWidth-8)+"px";
+  ctxEl.style.top = (r.bottom+6)+"px";
+  ctxEl.querySelector("[data-r=save]").addEventListener("click", saveRecipe);
+  ctxEl.querySelector("[data-r=apply]").addEventListener("click",
+    ()=>{ closeCtx(); $("#recipe-file").click(); });
+  e.stopPropagation();
+});
+async function saveRecipe(){
+  closeCtx();
+  try{
+    const d = await (await api("/api/recipe")).json();
+    const blob = new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = ($("#filechip").textContent.split(" ")[0]||"data").replace(/\.\w+$/,"") + "_recipe.json";
+    a.click(); URL.revokeObjectURL(a.href);
+    toast(`recipe saved (${d.steps.length} steps) — replay via CLI or 'Apply a recipe'`);
+  }catch(e){ toast(e.message); }
+}
+$("#recipe-file").addEventListener("change", async ()=>{
+  const f = $("#recipe-file").files[0];
+  $("#recipe-file").value = "";
+  if(!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    const steps = Array.isArray(data) ? data : data.steps;
+    if(!steps?.length) throw new Error("no steps in this recipe");
+    const d = await (await api("/api/execute",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({steps})})).json();
+    handleExecuted(d, steps.length);
+  }catch(e){ toast("Recipe failed: "+e.message); }
+});
+
 /* ---------- history & versions ---------- */
 const KIND_COLOR = {upload:"var(--accent-2)", ai:"var(--accent)",
                     manual:"var(--warn)", revert:"var(--text-muted)"};
@@ -911,7 +1006,7 @@ function afterStateChange(d, msg){
   state.grid = d.grid; clearSel(); renderGrid();
   $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
   $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
-  ["#btn-report","#dl"].forEach(s=>$(s).classList.remove("hidden"));
+  ["#btn-report","#dl","#dlx"].forEach(s=>$(s).classList.remove("hidden"));
   toast(msg + " — Ctrl+Z to step back");
 }
 $("#btn-history").addEventListener("click", openHistory);

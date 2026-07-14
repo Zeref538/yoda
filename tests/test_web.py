@@ -118,6 +118,37 @@ def test_edit_rejects_bad_targets(uploaded):
     assert client.post("/api/edit", json={"op": "nope"}).status_code == 400
 
 
+def test_colstats_numeric_and_categorical(uploaded):
+    d = client.get("/api/colstats?col=monthly_spend").json()
+    assert d["nulls"] >= 0 and "unique" in d
+    d = client.get("/api/colstats?col=city").json()
+    assert d.get("top_values"), d
+    assert client.get("/api/colstats?col=ghost").status_code == 400
+
+
+def test_recipe_and_xlsx_endpoints(uploaded):
+    assert client.get("/api/recipe").status_code == 400  # nothing applied yet
+    steps = [{"tool": "trim_whitespace", "col": "full_name", "params": {},
+              "reason": "ws"}]
+    client.post("/api/plan", json={"planner": "rule_based"})
+    client.post("/api/execute", json={"steps": steps})
+    d = client.get("/api/recipe").json()
+    assert d["steps"] == steps and d["yoda_recipe"] == 1
+
+    r = client.get("/api/download_xlsx")
+    assert r.status_code == 200
+    assert "spreadsheetml" in r.headers["content-type"]
+
+
+def test_execute_returns_before_values(uploaded):
+    client.post("/api/plan", json={"planner": "rule_based"})
+    d = client.post("/api/execute", json={"steps": [
+        {"tool": "normalize_phone", "col": "phone", "params": {},
+         "reason": "x"}]}).json()
+    rid = str(d["grid"]["changed"]["phone"][0])
+    assert d["grid"]["before"]["phone"][rid]  # old value present for tooltip
+
+
 def test_upload_required_first():
     S.clear()
     assert client.post("/api/plan", json={}).status_code == 400

@@ -123,6 +123,8 @@ def clean(
     planner: str = typer.Option("llm", help="'llm' or 'rule_based' (no-AI baseline)"),
     yes: bool = typer.Option(False, "--yes", help="Auto-approve the plan (benchmark runs)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan and report only; touch nothing"),
+    recipe: str = typer.Option(None, help="Replay a saved recipe instead of planning"),
+    save_recipe: str = typer.Option(None, help="Save the approved plan as a recipe JSON"),
 ) -> None:
     """Profile → plan (local LLM) → human approval → execute → verify → report."""
     # Imports here keep `yoda version` fast and dependency-light.
@@ -153,7 +155,13 @@ def clean(
     console.print(summary)
     console.print()
 
-    if planner == "rule_based":
+    if recipe:
+        from yoda.recipe import load_recipe
+        planner_obj = RuleBasedPlanner()  # verifier follow-ups stay deterministic
+        plan = load_recipe(recipe)
+        console.print(f"[dim]Step 2/5 Plan loaded from recipe [bold]{recipe}[/bold] "
+                      "(previously human-approved).[/dim]\n")
+    elif planner == "rule_based":
         planner_obj = RuleBasedPlanner()
         plan = planner_obj.plan(prof)
         console.print("[dim]Step 2/5 Planner: rule-based baseline (no LLM).[/dim]\n")
@@ -185,10 +193,15 @@ def clean(
         raise typer.Exit()
 
     console.print("[cyan]Step 3/5[/cyan] Your approval — nothing runs without it:")
-    approved = approve_plan(plan, console, auto_yes=yes)
+    approved = approve_plan(plan, console, auto_yes=yes or bool(recipe))
     if not approved:
         console.print("[yellow]No steps approved — exiting without touching anything.[/yellow]")
         raise typer.Exit()
+    if save_recipe:
+        from yoda.recipe import save_recipe as _save
+        _save(approved, save_recipe, source=path)
+        console.print(f"[dim]Recipe saved to [bold]{save_recipe}[/bold] — replay with "
+                      f"`yoda clean other.csv --recipe {save_recipe}`.[/dim]")
 
     src_path = Path(path)
     audit_path = src_path.with_name(src_path.stem + "_audit.jsonl")
@@ -237,6 +250,44 @@ def clean(
         f"Report        [bold]{report_path}[/bold]\n\n"
         f"[dim]Your original file was not modified.[/dim]",
         border_style="green", title="Results"))
+
+
+@app.command()
+def watch(
+    folder: str = typer.Argument(..., help="Folder to watch for new CSV/XLSX files"),
+    recipe: str = typer.Option(..., help="Recipe JSON to apply to every new file"),
+    out: str = typer.Option(None, help="Output folder (default <folder>/cleaned)"),
+    quarantine: str = typer.Option(None, help="Quarantine folder (default <folder>/quarantine)"),
+    interval: float = typer.Option(5.0, help="Poll interval in seconds"),
+    once: bool = typer.Option(False, "--once", help="Process current files, then exit"),
+) -> None:
+    """Auto-clean every file dropped into a folder using a saved recipe.
+
+    Files that fail recipe validation or leave unresolved issues after
+    verification are quarantined with a reason file, never silently shipped.
+    """
+    from yoda.recipe import load_recipe
+    from yoda.watch import run_watch
+
+    steps = load_recipe(recipe)
+    out_dir = out or str(Path(folder) / "cleaned")
+    q_dir = quarantine or str(Path(folder) / "quarantine")
+    _banner(f"watch mode - {len(steps)}-step recipe - Ctrl+C to stop")
+    console.print(f"Watching [bold]{folder}[/bold] -> cleaned: [bold]{out_dir}[/bold] "
+                  f"| quarantine: [bold]{q_dir}[/bold]\n")
+
+    def show(r: dict) -> None:
+        if r["status"] == "cleaned":
+            console.print(f"  [green]cleaned[/green] {r['file']} "
+                          f"({r['rows']} rows) -> {r['out']}")
+        else:
+            console.print(f"  [yellow]quarantined[/yellow] {r['file']} — {r['reason']}")
+
+    try:
+        run_watch(folder, steps, out_dir, q_dir, interval=interval,
+                  once=once, on_result=show)
+    except KeyboardInterrupt:
+        console.print("\n[dim]watch stopped.[/dim]")
 
 
 @app.command()
