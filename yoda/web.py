@@ -1,8 +1,9 @@
-"""Local web UI: FastAPI backend serving a single-page frontend.
+"""Local web UI: FastAPI backend serving a single-page spreadsheet frontend.
 
 Binds to 127.0.0.1 only — this is a local tool, not a service. State is a
-single in-memory session (one user, one file at a time), mirroring the CLI
-flow: upload → profile → plan → approve → execute → verify → report.
+single in-memory session (one user, one file at a time). The grid shows raw
+data because it never leaves this machine; the LLM still only ever receives
+the redacted profile (plus the user's own typed instruction).
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from yoda.verifier import diff_profiles, follow_up_plan
 app = FastAPI(title="YODA — Your Offline Data Agent", docs_url=None, redoc_url=None)
 
 STATIC = Path(__file__).parent / "static"
+GRID_MAX_ROWS = 500
 
 # Single-user local session.
 S: dict = {}
@@ -68,6 +70,44 @@ def _issues(prof: dict) -> list[dict]:
     return rows
 
 
+def _grid(df: pd.DataFrame, changed: dict[str, list] | None = None,
+          new_cols: list[str] | None = None, removed: list | None = None) -> dict:
+    """Grid payload: columns, up to GRID_MAX_ROWS rows keyed by row id,
+    plus diff decorations (changed cells / new columns / removed row ids)."""
+    view = df.head(GRID_MAX_ROWS)
+    rows = []
+    for rid, row in view.iterrows():
+        cells = ["" if pd.isna(v) else str(v) for v in row]
+        rows.append({"rid": int(rid), "cells": cells})
+    return {
+        "columns": [str(c) for c in df.columns],
+        "rows": rows,
+        "n_total_rows": len(df),
+        "truncated": len(df) > GRID_MAX_ROWS,
+        "changed": changed or {},          # {col: [rids]}
+        "new_cols": new_cols or [],
+        "removed_rids": [int(r) for r in (removed or [])],
+    }
+
+
+def _diff(before: pd.DataFrame, after: pd.DataFrame) -> tuple[dict, list, list]:
+    """Cell-level diff aligned on the (preserved) index."""
+    shared_rids = before.index.intersection(after.index)
+    removed = list(before.index.difference(after.index))
+    new_cols = [str(c) for c in after.columns if c not in before.columns]
+    changed: dict[str, list] = {}
+    for col in before.columns:
+        if col not in after.columns:
+            continue
+        b = before.loc[shared_rids, col]
+        a = after.loc[shared_rids, col]
+        mask = (b.astype(str) != a.astype(str)) & ~(b.isna() & a.isna())
+        rids = [int(r) for r in shared_rids[mask]]
+        if rids:
+            changed[str(col)] = rids
+    return changed, new_cols, removed
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     return (STATIC / "index.html").read_text(encoding="utf-8")
@@ -92,26 +132,40 @@ async def upload(file: UploadFile = File(...)):
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
+    df.index = pd.RangeIndex(len(df))  # stable row ids for diffing
     prof = profile(df)
     S.clear()
-    S.update(df=df, prof=prof, name=file.filename, rounds=[], cleaned=None)
-    return {"name": file.filename, "n_rows": len(df), "n_cols": len(df.columns),
-            "issues": _issues(prof), "profile": json.loads(json.dumps(prof, default=str))}
+    S.update(df=df, cleaned=df, prof=prof, name=file.filename, rounds=[],
+             planner=None, new_prof=prof, verdicts=[])
+    return {
+        "name": file.filename, "n_rows": len(df), "n_cols": len(df.columns),
+        "issues": _issues(prof),
+        "profile": json.loads(json.dumps(prof, default=str)),
+        "grid": _grid(df),
+    }
 
 
 @app.post("/api/plan")
 def plan(body: dict):
     if "prof" not in S:
         raise HTTPException(400, "upload a file first")
+    prof = profile(S["cleaned"]) if S["rounds"] else S["prof"]
+    col = body.get("col")
+    instruction = body.get("instruction") or None
+
     if body.get("planner") == "rule_based":
         S["planner"] = RuleBasedPlanner()
-        steps = S["planner"].plan(S["prof"])
+        steps = S["planner"].plan(prof)
+        if col:
+            steps = [s for s in steps if s.get("col") in (col, None)]
         outcome = {"source": "rule_based"}
     else:
         S["planner"] = LLMPlanner(model=body.get("model", "qwen3.5:4b"))
-        steps = S["planner"].plan(S["prof"])
+        steps = S["planner"].plan(prof, instruction=instruction, col=col)
+        if col:  # keep the model honest: never leak steps onto other columns
+            steps = [s for s in steps if s.get("col") in (col, None)]
         outcome = S["planner"].last_outcome
-    S["plan"] = steps
+    S["current_prof"] = prof
     return {"steps": steps, "outcome": outcome}
 
 
@@ -120,28 +174,29 @@ def run(body: dict):
     if "prof" not in S:
         raise HTTPException(400, "upload a file first")
     steps = body.get("steps", [])
+    source = S["cleaned"]
     try:
-        validate_plan({"steps": steps}, S["prof"] if not S["rounds"]
-                      else profile(S["cleaned"]))
+        validate_plan({"steps": steps}, profile(source))
     except Exception as exc:
         raise HTTPException(400, f"invalid plan: {exc}")
-    source = S["cleaned"] if S["rounds"] else S["df"]
+
     cleaned, audit = execute(source, steps)
+    changed, new_cols, removed = _diff(source, cleaned)
     S["cleaned"] = cleaned
     S["rounds"].append({"plan": steps, "audit": audit})
 
     new_prof = profile(cleaned)
     verdicts = diff_profiles(S["prof"], new_prof)
     S["verdicts"], S["new_prof"] = verdicts, new_prof
-    followup = ([] if len(S["rounds"]) >= 2
+    followup = ([] if len(S["rounds"]) >= 4 or S["planner"] is None
                 else follow_up_plan(verdicts, S["planner"], new_prof))
-    S["followup"] = followup
     return {
         "audit": json.loads(json.dumps(audit, default=str)),
         "verdicts": verdicts,
         "followup": followup,
         "round": len(S["rounds"]),
         "n_rows_before": len(S["df"]), "n_rows_after": len(cleaned),
+        "grid": _grid(cleaned, changed, new_cols, removed),
     }
 
 
@@ -157,7 +212,7 @@ def report():
 
 @app.get("/api/download")
 def download():
-    if S.get("cleaned") is None:
+    if S.get("cleaned") is None or not S.get("rounds"):
         raise HTTPException(400, "nothing executed yet")
     out = Path(tempfile.gettempdir()) / (Path(S["name"]).stem + "_cleaned.csv")
     S["cleaned"].to_csv(out, index=False)

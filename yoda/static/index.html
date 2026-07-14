@@ -6,379 +6,501 @@
 <title>YODA — Your Offline Data Agent</title>
 <style>
   :root{
-    --bg:#0F172A; --surface:#1E293B; --muted:#272F42; --border:#3B4761;
-    --fg:#F8FAFC; --fg-dim:#94A3B8; --accent:#22C55E; --accent-dim:#14532D;
-    --warn:#FACC15; --danger:#EF4444; --info:#38BDF8;
-    --mono:ui-monospace,'Cascadia Code',Consolas,Menlo,monospace;
-    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --bg:#07090d; --surface:#0d1117; --surface-2:#11161f; --border:#1e2733;
+    --text:#e6edf3; --text-muted:#8b98a9;
+    --accent:#8b5cf6; --accent-dim:rgba(139,92,246,.12);
+    --accent-2:#22d3ee; --accent-2-dim:rgba(34,211,238,.12);
+    --ok:#22c55e; --ok-dim:rgba(34,197,94,.14);
+    --warn:#facc15; --warn-dim:rgba(250,204,21,.12);
+    --danger:#f87171; --danger-dim:rgba(248,113,113,.12);
+    --mono:"JetBrains Mono",ui-monospace,'Cascadia Code',Consolas,monospace;
+    --body:"Inter",system-ui,-apple-system,'Segoe UI',sans-serif;
   }
-  *{box-sizing:border-box;margin:0}
+  *{margin:0;padding:0;box-sizing:border-box}
   html{color-scheme:dark}
-  body{background:var(--bg);color:var(--fg);font-family:var(--sans);
-       font-size:16px;line-height:1.55;min-height:100dvh}
+  body{background:var(--bg);color:var(--text);font-family:var(--body);
+       font-size:15px;line-height:1.6;height:100dvh;display:flex;
+       flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--accent-dim);color:var(--accent)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px}
+  ::-webkit-scrollbar-thumb:hover{background:#2b3a4d}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
-  header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:.75rem;
-         padding:.8rem 1.25rem;background:rgba(15,23,42,.92);backdrop-filter:blur(6px);
-         border-bottom:1px solid var(--border)}
-  header .logo{display:flex;align-items:center;gap:.55rem;font-weight:700;font-size:1.05rem}
-  header .logo svg{color:var(--accent)}
-  .badge{display:inline-flex;align-items:center;gap:.35rem;font-size:.75rem;
-         font-family:var(--mono);color:var(--accent);background:var(--accent-dim);
-         border:1px solid var(--accent);border-radius:999px;padding:.15rem .6rem}
-  .pulse{width:.5rem;height:.5rem;border-radius:50%;background:var(--accent)}
+  /* CRT atmosphere, straight from the portfolio */
+  body::after{content:"";position:fixed;inset:0;z-index:200;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0,
+      rgba(255,255,255,.02) 1px,transparent 1px,transparent 3px),
+      radial-gradient(ellipse 120% 90% at 50% 40%,transparent 62%,rgba(0,0,0,.35) 100%)}
 
-  main{max-width:72rem;margin:0 auto;padding:1.5rem 1.25rem 4rem}
-
-  /* stepper */
-  .steps{display:flex;gap:.25rem;margin:0 0 1.5rem;padding:0;list-style:none;
-         font-size:.8rem;font-family:var(--mono);overflow-x:auto}
-  .steps li{flex:1;min-width:7rem;text-align:center;padding:.5rem .25rem;
-            border-bottom:3px solid var(--border);color:var(--fg-dim);white-space:nowrap}
-  .steps li.active{border-color:var(--accent);color:var(--fg);font-weight:600}
-  .steps li.done{border-color:var(--accent-dim);color:var(--accent)}
-
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:.75rem;
-        padding:1.25rem;margin-bottom:1.25rem}
-  .card h2{font-size:1.05rem;margin-bottom:.25rem;display:flex;align-items:center;gap:.5rem}
-  .card h2 svg{color:var(--accent);flex-shrink:0}
-  .card p.sub{color:var(--fg-dim);font-size:.85rem;margin-bottom:1rem}
+  button{font:inherit;cursor:pointer;border-radius:8px;padding:.5rem 1rem;
+         border:1px solid var(--border);background:var(--surface-2);color:var(--text);
+         transition:border-color .18s,background .18s;min-height:40px}
+  button:hover{border-color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover{background:#a78bfa}
+  button.ghost{background:transparent}
+  button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  input[type=text],textarea,select{font:inherit;background:var(--bg);color:var(--text);
+        border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem}
+  input:focus-visible,textarea:focus-visible,select:focus-visible{
+        outline:2px solid var(--accent-2);outline-offset:1px}
+  textarea{resize:vertical;min-height:4.2rem;width:100%}
   .hidden{display:none!important}
+  .mono{font-family:var(--mono)}
 
-  /* dropzone */
-  .drop{border:2px dashed var(--border);border-radius:.75rem;padding:2.5rem 1rem;
-        text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
-  .drop:hover,.drop.over{border-color:var(--accent);background:var(--muted)}
-  .drop svg{color:var(--fg-dim);margin-bottom:.5rem}
-  .drop .hint{color:var(--fg-dim);font-size:.85rem}
-
-  table{width:100%;border-collapse:collapse;font-size:.85rem}
-  th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid var(--muted)}
-  th{color:var(--fg-dim);font-weight:600;font-size:.75rem;text-transform:uppercase;
-     letter-spacing:.05em}
-  td.num,th.num{text-align:right;font-family:var(--mono)}
-  td .col{font-family:var(--mono);color:var(--info)}
-  .table-wrap{overflow-x:auto}
-
-  button{font:inherit;cursor:pointer;border-radius:.55rem;padding:.55rem 1.1rem;
-         border:1px solid var(--border);background:var(--muted);color:var(--fg);
-         transition:background .15s,border-color .15s,opacity .15s;min-height:44px}
-  button:hover{border-color:var(--fg-dim)}
-  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#06220f;
-                 font-weight:700}
-  button.primary:hover{background:#4ade80}
-  button:disabled{opacity:.45;cursor:not-allowed}
-  .row{display:flex;gap:.75rem;flex-wrap:wrap;align-items:center}
+  /* ---------- top bar ---------- */
+  header{display:flex;align-items:center;gap:.9rem;padding:.65rem 1.1rem;
+         background:var(--surface);border-bottom:1px solid var(--border);z-index:30}
+  .logo{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:1rem;
+        font-family:var(--mono);letter-spacing:.04em}
+  .logo svg{color:var(--accent)}
+  .logo .sub{color:var(--text-muted);font-weight:400;font-size:.78rem}
+  .badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.7rem;
+         font-family:var(--mono);color:var(--accent-2);background:var(--accent-2-dim);
+         border:1px solid rgba(34,211,238,.4);border-radius:999px;padding:.12rem .6rem}
+  .pulse{width:.45rem;height:.45rem;border-radius:50%;background:var(--accent-2)}
+  .filechip{font-family:var(--mono);font-size:.78rem;color:var(--text-muted);
+         border:1px dashed var(--border);border-radius:8px;padding:.25rem .6rem}
   .grow{flex:1}
+  header .model{width:9.5rem;min-height:40px;font-family:var(--mono);font-size:.8rem}
 
-  select,input[type=text]{font:inherit;background:var(--bg);color:var(--fg);
-        border:1px solid var(--border);border-radius:.55rem;padding:.5rem .7rem;min-height:44px}
-  select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-  label{font-size:.8rem;color:var(--fg-dim);display:block;margin-bottom:.25rem}
+  /* ---------- layout ---------- */
+  .stage{flex:1;display:flex;min-height:0}
+  .gridwrap{flex:1;overflow:auto;position:relative}
 
-  /* plan steps */
-  .step-item{display:flex;gap:.8rem;align-items:flex-start;padding:.8rem;
-             border:1px solid var(--border);border-radius:.6rem;margin-bottom:.6rem;
-             background:var(--bg);transition:opacity .2s,border-color .2s}
-  .step-item.off{opacity:.45}
-  .step-item input[type=checkbox]{width:1.35rem;height:1.35rem;margin-top:.2rem;
-             accent-color:var(--accent);cursor:pointer;flex-shrink:0}
-  .step-item .tool{font-family:var(--mono);font-weight:600;color:var(--accent)}
-  .step-item .reason{color:var(--fg-dim);font-size:.85rem}
-  .step-item .params{font-family:var(--mono);font-size:.78rem;color:var(--warn)}
+  /* ---------- empty state / dropzone ---------- */
+  .empty{height:100%;display:flex;flex-direction:column;align-items:center;
+         justify-content:center;gap:1rem;padding:2rem}
+  .drop{border:2px dashed var(--border);border-radius:14px;padding:3rem 3.5rem;
+        text-align:center;cursor:pointer;transition:border-color .2s,box-shadow .2s;
+        background:var(--surface)}
+  .drop:hover,.drop.over{border-color:var(--accent)}
+  .drop svg{color:var(--accent);margin-bottom:.75rem}
+  .drop .hint{color:var(--text-muted);font-size:.82rem;font-family:var(--mono)}
+  .empty .tag{font-family:var(--mono);color:var(--accent-2);font-size:.8rem;
+        display:flex;align-items:center;gap:.6rem}
+  .empty .tag::after{content:"";height:1px;width:56px;background:var(--border)}
 
-  .status-ok{color:var(--accent)} .status-error{color:var(--danger)}
-  .status-skipped{color:var(--warn)}
-  .v-resolved{color:var(--accent)} .v-flagged{color:var(--info)}
-  .v-partially_resolved{color:var(--warn)} .v-unresolved,.v-new_issue{color:var(--danger)}
+  /* ---------- data grid ---------- */
+  table.grid{border-collapse:separate;border-spacing:0;font-size:.78rem;
+             font-family:var(--mono);white-space:nowrap}
+  .grid th,.grid td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+             padding:.28rem .6rem;max-width:16rem;overflow:hidden;text-overflow:ellipsis}
+  .grid thead th{position:sticky;top:0;z-index:10;background:var(--surface-2);
+             color:var(--text);font-weight:600;cursor:pointer;user-select:none;
+             transition:background .15s;text-align:left}
+  .grid thead th:hover{background:#182030}
+  .grid thead th.selected{background:var(--accent-dim);color:var(--accent);
+             box-shadow:inset 0 -2px 0 var(--accent)}
+  .grid thead th.newcol{color:var(--accent-2);box-shadow:inset 0 -2px 0 var(--accent-2)}
+  .grid thead th .cnt{display:inline-block;min-width:1.15rem;text-align:center;
+             margin-left:.4rem;font-size:.65rem;border-radius:999px;
+             background:var(--warn-dim);color:var(--warn);
+             border:1px solid rgba(250,204,21,.4);padding:0 .25rem}
+  .grid td{color:var(--text-muted)}
+  .grid td.rownum{position:sticky;left:0;background:var(--surface);color:#4b5a6d;
+             border-right:1px solid var(--border);z-index:5;font-size:.68rem}
+  .grid tbody tr:hover td{background:rgba(139,92,246,.05)}
+  .grid td.changed{background:var(--ok-dim);color:var(--ok)}
+  .grid td.newcell{background:var(--accent-2-dim);color:var(--accent-2)}
 
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));
-        gap:.75rem;margin-bottom:1rem}
-  .kpi{background:var(--bg);border:1px solid var(--border);border-radius:.6rem;
-       padding:.8rem;text-align:center}
-  .kpi .n{font-family:var(--mono);font-size:1.5rem;font-weight:700;color:var(--accent)}
-  .kpi .l{font-size:.72rem;color:var(--fg-dim);text-transform:uppercase;letter-spacing:.05em}
+  /* legend + status bar */
+  .statusbar{display:flex;gap:1.1rem;align-items:center;padding:.45rem 1.1rem;
+       border-top:1px solid var(--border);background:var(--surface);
+       font-family:var(--mono);font-size:.72rem;color:var(--text-muted);flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:.35rem}
+  .sw{width:.75rem;height:.75rem;border-radius:3px;display:inline-block}
+  .sw.ok{background:var(--ok-dim);border:1px solid var(--ok)}
+  .sw.new{background:var(--accent-2-dim);border:1px solid var(--accent-2)}
+  .sw.warn{background:var(--warn-dim);border:1px solid var(--warn)}
 
-  .note{font-size:.8rem;color:var(--fg-dim);border-left:3px solid var(--accent);
-        padding:.4rem .8rem;background:var(--muted);border-radius:0 .4rem .4rem 0;
-        margin:.75rem 0}
-  .error-box{color:var(--danger);border-left:3px solid var(--danger);padding:.4rem .8rem;
-        background:var(--muted);border-radius:0 .4rem .4rem 0;margin:.75rem 0}
-  .spinner{display:inline-block;width:1rem;height:1rem;border:2px solid var(--fg-dim);
-        border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;
-        vertical-align:-.15rem;margin-right:.4rem}
+  /* ---------- drawer ---------- */
+  aside{width:24rem;max-width:90vw;background:var(--surface);
+        border-left:1px solid var(--border);display:flex;flex-direction:column;
+        transform:translateX(100%);transition:transform .25s ease-out;position:relative;z-index:25}
+  aside.open{transform:none}
+  .drawer-head{display:flex;align-items:center;gap:.6rem;padding:.9rem 1rem;
+        border-bottom:1px solid var(--border)}
+  .drawer-head h2{font-size:.95rem;font-family:var(--mono);color:var(--accent)}
+  .drawer-body{flex:1;overflow-y:auto;padding:1rem;display:flex;
+        flex-direction:column;gap:.9rem}
+  .panel-label{font-family:var(--mono);font-size:.72rem;color:var(--accent-2);
+        letter-spacing:.06em;display:flex;align-items:center;gap:.5rem}
+  .panel-label::after{content:"";height:1px;flex:1;background:var(--border)}
+  .issue-line{display:flex;justify-content:space-between;font-size:.8rem;
+        padding:.3rem .5rem;background:var(--surface-2);border-radius:6px;
+        border:1px solid var(--border)}
+  .issue-line .n{font-family:var(--mono);color:var(--warn)}
+  .suggestion{border:1px solid var(--border);border-radius:10px;padding:.7rem;
+        background:var(--surface-2);display:flex;gap:.6rem;align-items:flex-start;
+        transition:opacity .2s}
+  .suggestion.off{opacity:.4}
+  .suggestion input[type=checkbox]{width:1.2rem;height:1.2rem;margin-top:.15rem;
+        accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+  .suggestion .tool{font-family:var(--mono);font-weight:600;color:var(--accent)}
+  .suggestion .on-col{font-family:var(--mono);color:var(--accent-2);font-size:.78rem}
+  .suggestion .why{color:var(--text-muted);font-size:.78rem;margin-top:.15rem}
+  .thinking{display:flex;align-items:center;gap:.6rem;font-family:var(--mono);
+        font-size:.8rem;color:var(--accent-2)}
+  .spinner{width:1rem;height:1rem;border:2px solid var(--border);flex-shrink:0;
+        border-top-color:var(--accent-2);border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  pre.report{white-space:pre-wrap;font-family:var(--mono);font-size:.8rem;
-        background:var(--bg);border:1px solid var(--border);border-radius:.6rem;
-        padding:1rem;max-height:28rem;overflow:auto}
-  footer{color:var(--fg-dim);font-size:.75rem;text-align:center;padding:1rem}
+  .verdict{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;
+        padding:.28rem .5rem;border-radius:6px;background:var(--surface-2);
+        border:1px solid var(--border)}
+  .v-resolved{color:var(--ok)} .v-flagged{color:var(--accent-2)}
+  .v-partially_resolved{color:var(--warn)}
+  .v-unresolved,.v-new_issue{color:var(--danger)}
+  .errbox{color:var(--danger);background:var(--danger-dim);border:1px solid var(--danger);
+        border-radius:8px;padding:.5rem .7rem;font-size:.8rem}
+  .notebox{color:var(--text-muted);font-size:.75rem;border-left:2px solid var(--accent);
+        padding:.3rem .7rem;background:var(--accent-dim);border-radius:0 6px 6px 0}
+
+  /* ---------- report modal ---------- */
+  .modal{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);
+        display:flex;align-items:center;justify-content:center;padding:2rem}
+  .modal .inner{background:var(--surface);border:1px solid var(--border);
+        border-radius:14px;max-width:56rem;width:100%;max-height:85dvh;
+        display:flex;flex-direction:column}
+  .modal .inner header{border-radius:14px 14px 0 0}
+  .modal pre{flex:1;overflow:auto;padding:1.2rem;font-family:var(--mono);
+        font-size:.76rem;white-space:pre-wrap;color:var(--text-muted)}
+  .toast{position:fixed;bottom:4rem;left:50%;transform:translateX(-50%);z-index:150;
+        background:var(--surface-2);border:1px solid var(--accent);color:var(--text);
+        border-radius:10px;padding:.6rem 1.1rem;font-size:.82rem;
+        box-shadow:0 0 24px var(--accent-dim)}
 </style>
 </head>
 <body>
+
 <header>
   <div class="logo">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
     </svg>
-    YODA <span style="color:var(--fg-dim);font-weight:400">— Your Offline Data Agent</span>
+    YODA <span class="sub">// your offline data agent</span>
   </div>
+  <span class="badge"><span class="pulse"></span>100% LOCAL</span>
+  <span class="filechip hidden" id="filechip"></span>
   <div class="grow"></div>
-  <span class="badge" title="The model sees metadata only; requests go to localhost:11434">
-    <span class="pulse"></span> 100% LOCAL
-  </span>
+  <input type="text" class="model mono" id="model" value="qwen3.5:4b"
+         aria-label="Ollama model" title="Ollama model">
+  <button id="btn-clean-all" class="primary hidden">Clean everything</button>
+  <button id="btn-report" class="ghost hidden">Report</button>
+  <a id="dl" href="/api/download" download class="hidden"><button class="ghost">Download CSV</button></a>
+  <button id="btn-new" class="ghost hidden" title="Start over with a new file">New file</button>
 </header>
 
-<main>
-  <ol class="steps" id="stepper">
-    <li data-s="1" class="active">1 Upload</li>
-    <li data-s="2">2 Profile</li>
-    <li data-s="3">3 Plan</li>
-    <li data-s="4">4 Approve</li>
-    <li data-s="5">5 Results</li>
-  </ol>
-
-  <!-- 1 UPLOAD -->
-  <section class="card" id="card-upload">
-    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Upload a file</h2>
-    <p class="sub">CSV, Excel or SQLite. It never leaves this machine — the server is
-       <code>127.0.0.1</code> only.</p>
-    <div class="drop" id="drop" role="button" tabindex="0"
-         aria-label="Upload a CSV, Excel or SQLite file">
-      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <div><strong>Drop a file here</strong> or click to browse</div>
-      <div class="hint">.csv · .xlsx · .sqlite</div>
-      <input type="file" id="file" accept=".csv,.xlsx,.xls,.sqlite,.db,.sqlite3" hidden>
+<div class="stage">
+  <div class="gridwrap" id="gridwrap">
+    <!-- empty state -->
+    <div class="empty" id="empty">
+      <div class="tag">01 // load your data</div>
+      <div class="drop" id="drop" role="button" tabindex="0"
+           aria-label="Upload a CSV, Excel or SQLite file">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+          <polyline points="14 2 14 8 20 8"/></svg>
+        <div><strong>Drop a file</strong> or click to browse</div>
+        <div class="hint">.csv &middot; .xlsx &middot; .sqlite — never leaves this machine</div>
+        <input type="file" id="file" accept=".csv,.xlsx,.xls,.sqlite,.db,.sqlite3" hidden>
+      </div>
+      <div class="hint" style="color:var(--text-muted);font-size:.8rem;max-width:26rem;text-align:center">
+        Once loaded, <strong style="color:var(--text)">click any column header</strong> to tell
+        the AI what to do with it. The model only ever sees redacted statistics — not your rows.
+      </div>
     </div>
-    <div id="upload-error"></div>
-  </section>
+    <!-- data grid -->
+    <table class="grid hidden" id="grid" aria-label="Data grid"></table>
+  </div>
 
-  <!-- 2 PROFILE -->
-  <section class="card hidden" id="card-profile">
-    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Profile — issues detected <span style="color:var(--fg-dim);font-weight:400">(pure pandas, no AI yet)</span></h2>
-    <p class="sub" id="profile-sub"></p>
-    <div class="table-wrap"><table id="issues-table" aria-label="Detected issues">
-      <thead><tr><th>Issue</th><th>Column</th><th class="num">Count</th></tr></thead>
-      <tbody></tbody>
-    </table></div>
-    <div class="note">Only this statistical profile — with redacted samples — is ever
-      shown to the model. Your rows stay in this process's memory.</div>
-    <div class="row" style="margin-top:1rem">
-      <div><label for="planner">Planner</label>
-        <select id="planner">
-          <option value="llm">Local LLM (Ollama)</option>
-          <option value="rule_based">Rule-based baseline (no AI)</option>
-        </select></div>
-      <div><label for="model">Model</label>
-        <input type="text" id="model" value="qwen3.5:4b" size="14"></div>
-      <div style="align-self:flex-end">
-        <button class="primary" id="btn-plan">Generate plan</button></div>
+  <!-- drawer -->
+  <aside id="drawer" aria-label="AI assistant panel">
+    <div class="drawer-head">
+      <h2 id="drawer-title">column</h2>
+      <div class="grow"></div>
+      <button class="ghost" id="drawer-close" aria-label="Close panel"
+              style="min-height:32px;padding:.2rem .6rem">&#10005;</button>
     </div>
-    <div id="plan-error"></div>
-  </section>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+</div>
 
-  <!-- 3/4 PLAN + APPROVE -->
-  <section class="card hidden" id="card-plan">
-    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Approve the plan</h2>
-    <p class="sub" id="plan-sub"></p>
-    <div id="plan-steps"></div>
-    <div class="note">Nothing runs without your approval. Untick any step to skip it.</div>
-    <div class="row" style="margin-top:1rem">
-      <button class="primary" id="btn-execute">Execute approved steps</button>
-      <span id="exec-status" role="status" aria-live="polite"></span>
-    </div>
-    <div id="exec-error"></div>
-  </section>
+<div class="statusbar" id="statusbar">
+  <span id="status-text">no file loaded</span>
+  <div class="grow"></div>
+  <span class="chip hidden legend"><span class="sw ok"></span>changed by YODA</span>
+  <span class="chip hidden legend"><span class="sw new"></span>new column</span>
+  <span class="chip hidden legend"><span class="sw warn"></span>issues in column</span>
+</div>
 
-  <!-- 5 RESULTS -->
-  <section class="card hidden" id="card-results">
-    <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Results</h2>
-    <div class="kpis" id="kpis"></div>
-    <h3 style="font-size:.9rem;margin:.5rem 0">Executed steps</h3>
-    <div class="table-wrap"><table id="audit-table" aria-label="Executed steps">
-      <thead><tr><th>Tool</th><th>Column</th><th class="num">Rows affected</th>
-             <th>Status</th></tr></thead><tbody></tbody>
-    </table></div>
-    <h3 style="font-size:.9rem;margin:1rem 0 .5rem">Verification — did it actually work?</h3>
-    <div class="table-wrap"><table id="verdict-table" aria-label="Verification verdicts">
-      <thead><tr><th>Issue</th><th>Column</th><th class="num">Before</th>
-             <th class="num">After</th><th>Verdict</th></tr></thead><tbody></tbody>
-    </table></div>
-    <div id="followup-box" class="hidden">
-      <div class="note" style="border-color:var(--warn)">The verifier found issues that
-        survived round 1. Review the follow-up plan below (max 1 extra round).</div>
-      <div id="followup-steps"></div>
-      <button class="primary" id="btn-followup">Run follow-up round</button>
-    </div>
-    <div class="row" style="margin-top:1.25rem">
-      <a href="/api/download" download><button class="primary">Download cleaned CSV</button></a>
-      <button id="btn-report">View report</button>
-    </div>
-    <pre class="report hidden" id="report"></pre>
-  </section>
-
-  <footer>AI plans from metadata only · deterministic pandas executes · every change
-    audited · <a href="https://github.com/Zeref538/yoda" style="color:var(--fg-dim)">github.com/Zeref538/yoda</a></footer>
-</main>
+<div class="modal hidden" id="modal">
+  <div class="inner">
+    <header><div class="logo">cleaning report</div><div class="grow"></div>
+      <button class="ghost" id="modal-close" aria-label="Close report">&#10005;</button></header>
+    <pre id="report-pre"></pre>
+  </div>
+</div>
 
 <script>
 "use strict";
-const $ = (s) => document.querySelector(s);
-let planSteps = [], followupSteps = [];
+const $ = s => document.querySelector(s);
+const state = {grid:null, issues:[], suggestions:[], selectedCol:null,
+               busy:false, rounds:0, verdicts:[], followup:[]};
 
-function setStep(n){
-  document.querySelectorAll("#stepper li").forEach(li=>{
-    const s = +li.dataset.s;
-    li.classList.toggle("active", s===n);
-    li.classList.toggle("done", s<n);
-  });
-}
-function show(id){ $(id).classList.remove("hidden"); $(id).scrollIntoView({behavior:"smooth",block:"start"}); }
-function err(sel,msg){ $(sel).innerHTML = msg?`<div class="error-box">${msg}</div>`:""; }
-async function api(url,opts){
-  const r = await fetch(url,opts);
-  if(!r.ok){ const d = await r.json().catch(()=>({detail:r.statusText}));
-             throw new Error(d.detail||r.statusText); }
+/* ---------- helpers ---------- */
+async function api(url, opts){
+  const r = await fetch(url, opts);
+  if(!r.ok){const d = await r.json().catch(()=>({detail:r.statusText}));
+            throw new Error(d.detail || r.statusText);}
   return r;
 }
+function toast(msg){
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg; t.setAttribute("role","status");
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 3600);
+}
+function esc(s){const d=document.createElement("span");d.textContent=s;return d.innerHTML;}
 
-/* ---- upload ---- */
+/* ---------- upload ---------- */
 const drop = $("#drop"), fileInput = $("#file");
 drop.addEventListener("click", ()=>fileInput.click());
-drop.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();fileInput.click();} });
+drop.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fileInput.click();}});
 ["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
 ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
-drop.addEventListener("drop", e=>{ if(e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); });
-fileInput.addEventListener("change", ()=>{ if(fileInput.files[0]) upload(fileInput.files[0]); });
+drop.addEventListener("drop", e=>{if(e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]);});
+fileInput.addEventListener("change", ()=>{if(fileInput.files[0]) upload(fileInput.files[0]);});
 
 async function upload(file){
-  err("#upload-error","");
-  drop.innerHTML = '<span class="spinner"></span> Profiling ' + file.name + '…';
+  $("#status-text").textContent = "profiling " + file.name + " …";
   try{
     const fd = new FormData(); fd.append("file", file);
     const d = await (await api("/api/upload",{method:"POST",body:fd})).json();
-    $("#profile-sub").textContent =
-      `${d.name} — ${d.n_rows} rows x ${d.n_cols} columns, ${d.issues.length} issue signal(s) found.`;
-    const tb = $("#issues-table tbody"); tb.innerHTML = "";
-    d.issues.forEach(i=>{
-      tb.insertAdjacentHTML("beforeend",
-        `<tr><td>${i.issue}</td><td><span class="col">${i.col??"whole table"}</span></td>
-         <td class="num">${i.count}</td></tr>`);
-    });
-    setStep(2); show("#card-profile");
-  }catch(e){ err("#upload-error", e.message); }
-  drop.innerHTML = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-    <div><strong>Drop a file here</strong> or click to browse</div>
-    <div class="hint">.csv · .xlsx · .sqlite</div>`;
-  drop.appendChild(fileInput);
+    state.grid = d.grid; state.issues = d.issues; state.rounds = 0;
+    state.verdicts = []; state.followup = []; state.suggestions = [];
+    $("#filechip").textContent = `${d.name} · ${d.n_rows}×${d.n_cols}`;
+    ["#filechip","#btn-clean-all","#btn-new"].forEach(s=>$(s).classList.remove("hidden"));
+    $("#empty").classList.add("hidden"); $("#grid").classList.remove("hidden");
+    document.querySelectorAll(".legend").forEach(el=>el.classList.remove("hidden"));
+    renderGrid();
+    $("#status-text").textContent =
+      `${d.n_rows} rows · ${d.n_cols} columns · ${d.issues.length} issue signal(s) — click a column header to start`;
+    toast(`${d.issues.length} issue signals found — click a highlighted column`);
+  }catch(e){ $("#status-text").textContent = "error"; toast("Upload failed: "+e.message); }
 }
 
-/* ---- plan ---- */
-$("#btn-plan").addEventListener("click", async ()=>{
-  err("#plan-error","");
-  const btn = $("#btn-plan"); btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Planning…';
+/* ---------- grid ---------- */
+function issueCount(col){ return state.issues.filter(i=>i.col===col).length; }
+
+function renderGrid(){
+  const g = state.grid, table = $("#grid");
+  const changed = g.changed || {}, newCols = new Set(g.new_cols||[]);
+  let html = "<thead><tr><th style='cursor:default'></th>";
+  g.columns.forEach(c=>{
+    const n = issueCount(c);
+    const cls = [c===state.selectedCol?"selected":"", newCols.has(c)?"newcol":""].join(" ");
+    html += `<th class="${cls}" data-col="${esc(c)}" tabindex="0" role="button"
+              aria-label="Column ${esc(c)}${n?`, ${n} issues`:""}. Click to open AI panel.">
+              ${esc(c)}${n?`<span class="cnt">${n}</span>`:""}</th>`;
+  });
+  html += "</tr></thead><tbody>";
+  g.rows.forEach(r=>{
+    html += `<tr><td class="rownum">${r.rid+1}</td>`;
+    r.cells.forEach((v,ci)=>{
+      const col = g.columns[ci];
+      const cls = newCols.has(col) ? "newcell"
+        : (changed[col]||[]).includes(r.rid) ? "changed" : "";
+      html += `<td class="${cls}" title="${esc(v)}">${esc(v)}</td>`;
+    });
+    html += "</tr>";
+  });
+  html += "</tbody>";
+  table.innerHTML = html;
+  table.querySelectorAll("thead th[data-col]").forEach(th=>{
+    th.addEventListener("click", ()=>openColumn(th.dataset.col));
+    th.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openColumn(th.dataset.col);}});
+  });
+}
+
+/* ---------- drawer ---------- */
+function openDrawer(){ $("#drawer").classList.add("open"); }
+function closeDrawer(){ $("#drawer").classList.remove("open");
+  state.selectedCol = null; if(state.grid) renderGrid(); }
+$("#drawer-close").addEventListener("click", closeDrawer);
+
+function openColumn(col){
+  state.selectedCol = col; state.suggestions = [];
+  renderGrid(); renderDrawer(); openDrawer();
+}
+$("#btn-clean-all").addEventListener("click", ()=>{
+  state.selectedCol = null; state.suggestions = [];
+  renderGrid(); renderDrawer(true); openDrawer();
+});
+
+function renderDrawer(wholeTable=false){
+  const col = state.selectedCol;
+  $("#drawer-title").textContent = wholeTable||!col ? "whole table" : col;
+  const body = $("#drawer-body");
+  const issues = col ? state.issues.filter(i=>i.col===col) : state.issues;
+  let html = `<div class="panel-label">detected issues</div>`;
+  html += issues.length
+    ? issues.map(i=>`<div class="issue-line"><span>${esc(i.issue)}${!col&&i.col?` <span class="mono" style="color:var(--accent-2)">${esc(i.col)}</span>`:""}</span><span class="n">${esc(String(i.count))}</span></div>`).join("")
+    : `<div class="issue-line"><span>nothing suspicious found</span><span class="n">0</span></div>`;
+
+  html += `
+    <div class="panel-label">ask the ai</div>
+    <textarea id="instruction" placeholder="${col
+      ? `e.g. normalize these to ISO dates… / standardize the casing… (optional — leave empty to let YODA decide for '${esc(col)}')`
+      : "e.g. clean everything but don't touch the email column (optional)"}"
+      aria-label="Instruction for the AI"></textarea>
+    <div style="display:flex;gap:.6rem">
+      <button class="primary" id="btn-suggest" style="flex:1">Suggest fixes</button>
+    </div>
+    <div class="notebox">The model receives only redacted statistics + your instruction —
+      never your data.</div>
+    <div id="think" class="hidden thinking"><span class="spinner"></span><span id="think-word"></span></div>
+    <div id="sugg-error"></div>
+    <div id="sugg-box"></div>
+    <div id="verdict-box"></div>`;
+  body.innerHTML = html;
+  $("#btn-suggest").addEventListener("click", ()=>suggest(col));
+  renderVerdicts();
+}
+
+/* ---------- suggest (with action words) ---------- */
+const ACTIONS = [
+  "reading column statistics…", "scanning format signatures…",
+  "consulting the local model…", "weighing tool options…",
+  "drafting repair steps…", "validating JSON against schema…",
+  "double-checking column names…"
+];
+let actionTimer = null;
+function startThinking(){
+  const box = $("#think"), word = $("#think-word");
+  box.classList.remove("hidden");
+  let i = 0; word.textContent = ACTIONS[0];
+  actionTimer = setInterval(()=>{ i=(i+1)%ACTIONS.length; word.textContent=ACTIONS[i]; }, 1800);
+}
+function stopThinking(){ clearInterval(actionTimer); $("#think")?.classList.add("hidden"); }
+
+async function suggest(col){
+  if(state.busy) return; state.busy = true;
+  $("#sugg-error").innerHTML = ""; $("#sugg-box").innerHTML = "";
+  $("#btn-suggest").disabled = true; startThinking();
   try{
     const d = await (await api("/api/plan",{method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({planner:$("#planner").value, model:$("#model").value})})).json();
-    planSteps = d.steps;
-    const src = d.outcome.source==="rule_based" ? "rule-based baseline (no AI)"
-      : d.outcome.source==="fallback_rule_based"
-      ? "LLM failed — deterministic fallback plan"
-      : `${$("#model").value}, valid JSON in ${d.outcome.attempts} attempt(s)`;
-    $("#plan-sub").textContent = `Plan source: ${src}. ${d.steps.length} step(s) proposed.`;
-    renderSteps("#plan-steps", planSteps);
-    setStep(4); show("#card-plan");
-  }catch(e){ err("#plan-error", e.message); }
-  btn.disabled = false; btn.textContent = "Generate plan";
-});
+      body:JSON.stringify({model:$("#model").value, col,
+                           instruction:$("#instruction").value.trim()})})).json();
+    state.suggestions = d.steps;
+    const src = d.outcome.source==="fallback_rule_based"
+      ? "model failed — deterministic fallback"
+      : `${$("#model").value} · valid in ${d.outcome.attempts} attempt(s)`;
+    renderSuggestions(src);
+  }catch(e){ $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  stopThinking(); $("#btn-suggest").disabled = false; state.busy = false;
+}
 
-function renderSteps(sel, steps){
-  const box = $(sel); box.innerHTML = "";
-  steps.forEach((s,i)=>{
+function renderSuggestions(src){
+  const box = $("#sugg-box");
+  if(!state.suggestions.length){
+    box.innerHTML = `<div class="issue-line"><span>the AI proposes no changes here</span><span class="n">0</span></div>`;
+    return;
+  }
+  let html = `<div class="panel-label">suggested fixes <span class="mono" style="color:var(--text-muted);letter-spacing:0">${esc(src)}</span></div>`;
+  state.suggestions.forEach((s,i)=>{
     const params = Object.keys(s.params||{}).length ? JSON.stringify(s.params) : "";
-    box.insertAdjacentHTML("beforeend", `
-      <div class="step-item" data-i="${i}">
-        <input type="checkbox" checked id="${sel.slice(1)}-${i}"
-               aria-label="Include step: ${s.tool} on ${s.col??"whole table"}">
+    html += `
+      <div class="suggestion" data-i="${i}">
+        <input type="checkbox" checked aria-label="Approve: ${esc(s.tool)} on ${esc(s.col??'whole table')}">
         <div>
-          <div><span class="tool">${s.tool}</span>
-               <span class="col">(${s.col??"whole table"})</span>
-               ${params?`<span class="params">${params}</span>`:""}</div>
-          <div class="reason">${s.reason||""}</div>
+          <div><span class="tool">${esc(s.tool)}</span>
+               <span class="on-col">(${esc(s.col??"whole table")})</span></div>
+          ${params?`<div class="mono" style="font-size:.72rem;color:var(--warn)">${esc(params)}</div>`:""}
+          <div class="why">${esc(s.reason||"")}</div>
         </div>
-      </div>`);
+      </div>`;
   });
-  box.querySelectorAll("input[type=checkbox]").forEach(cb=>{
-    cb.addEventListener("change", ()=>cb.closest(".step-item").classList.toggle("off", !cb.checked));
+  html += `<button class="primary" id="btn-approve">Approve &amp; apply</button>
+           <div class="notebox">Only ticked steps run. Changed cells turn
+           <span style="color:var(--ok)">green</span> in the grid.</div>`;
+  box.innerHTML = html;
+  box.querySelectorAll(".suggestion input").forEach(cb=>{
+    cb.addEventListener("change",()=>cb.closest(".suggestion").classList.toggle("off",!cb.checked));
   });
+  $("#btn-approve").addEventListener("click", applyApproved);
 }
-function checkedSteps(sel, steps){
-  return [...$(sel).querySelectorAll(".step-item")]
+
+/* ---------- execute ---------- */
+async function applyApproved(){
+  if(state.busy) return;
+  const steps = [...document.querySelectorAll("#sugg-box .suggestion")]
     .filter(el=>el.querySelector("input").checked)
-    .map(el=>steps[+el.dataset.i]);
-}
-
-/* ---- execute ---- */
-$("#btn-execute").addEventListener("click", ()=>runSteps(checkedSteps("#plan-steps",planSteps),"#btn-execute","#exec-error"));
-$("#btn-followup").addEventListener("click", ()=>runSteps(checkedSteps("#followup-steps",followupSteps),"#btn-followup","#exec-error"));
-
-async function runSteps(steps, btnSel, errSel){
-  err(errSel,"");
-  if(!steps.length){ err(errSel,"No steps selected."); return; }
-  const btn = $(btnSel); btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Executing…';
+    .map(el=>state.suggestions[+el.dataset.i]);
+  if(!steps.length){ toast("No steps ticked."); return; }
+  state.busy = true;
+  const btn = $("#btn-approve"); btn.disabled = true; btn.textContent = "Applying…";
   try{
     const d = await (await api("/api/execute",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({steps})})).json();
-    renderResults(d);
-    setStep(5); show("#card-results");
-  }catch(e){ err(errSel, e.message); }
-  btn.disabled = false;
-  btn.textContent = btnSel==="#btn-execute" ? "Execute approved steps" : "Run follow-up round";
+    state.grid = d.grid; state.rounds = d.round;
+    state.verdicts = d.verdicts; state.followup = d.followup;
+    // refresh issue badges from surviving verdicts
+    state.issues = state.issues.filter(i=>{
+      const v = d.verdicts.find(v=>v.col===i.col || (!v.col && !i.col));
+      return !(v && ["resolved","flagged"].includes(v.verdict));
+    });
+    renderGrid();
+    const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
+    const removed = d.grid.removed_rids.length;
+    $("#status-text").textContent =
+      `round ${d.round} — ${changed} cells changed, ${removed} duplicate rows removed, `+
+      `${d.n_rows_after} rows remain`;
+    $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows_after+"×");
+    ["#btn-report","#dl"].forEach(s=>$(s).classList.remove("hidden"));
+    toast(`Applied ${steps.length} step(s) — ${changed} cells changed`);
+    state.suggestions = d.followup || [];
+    const box = $("#sugg-box");
+    if(state.suggestions.length){
+      renderSuggestions("verifier follow-up — issues survived");
+    } else { box.innerHTML = ""; }
+    renderVerdicts();
+  }catch(e){ $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  state.busy = false;
 }
 
-function renderResults(d){
-  const changed = d.audit.reduce((a,e)=>a+(e.rows_affected||0),0);
-  const open = d.verdicts.filter(v=>["unresolved","new_issue"].includes(v.verdict)).length;
-  $("#kpis").innerHTML = `
-    <div class="kpi"><div class="n">${d.n_rows_before} &rarr; ${d.n_rows_after}</div><div class="l">rows</div></div>
-    <div class="kpi"><div class="n">${changed}</div><div class="l">changes this round</div></div>
-    <div class="kpi"><div class="n">${d.round}/2</div><div class="l">rounds</div></div>
-    <div class="kpi"><div class="n" style="color:${open? "var(--warn)":"var(--accent)"}">${open}</div><div class="l">issues open</div></div>`;
-  const at = $("#audit-table tbody"); at.innerHTML = "";
-  d.audit.forEach(e=>{
-    at.insertAdjacentHTML("beforeend",
-      `<tr><td class="tool" style="font-family:var(--mono)">${e.tool}</td>
-       <td><span class="col">${e.col??"—"}</span></td>
-       <td class="num">${e.rows_affected??0}</td>
-       <td class="status-${e.status}">${e.status}${e.error?` — ${e.error}`:""}</td></tr>`);
-  });
-  const vt = $("#verdict-table tbody"); vt.innerHTML = "";
+function renderVerdicts(){
+  const box = $("#verdict-box"); if(!box) return;
+  if(!state.verdicts.length){ box.innerHTML=""; return; }
+  const col = state.selectedCol;
+  const list = col ? state.verdicts.filter(v=>v.col===col) : state.verdicts;
+  if(!list.length){ box.innerHTML=""; return; }
   const order = {unresolved:0,new_issue:0,partially_resolved:1,flagged:2,resolved:3};
-  [...d.verdicts].sort((a,b)=>(order[a.verdict]??9)-(order[b.verdict]??9)).forEach(v=>{
-    vt.insertAdjacentHTML("beforeend",
-      `<tr><td>${v.issue}</td><td><span class="col">${v.col??"whole table"}</span></td>
-       <td class="num">${v.before}</td><td class="num">${v.after}</td>
-       <td class="v-${v.verdict}">${v.verdict.replaceAll("_"," ")}</td></tr>`);
-  });
-  followupSteps = d.followup||[];
-  $("#followup-box").classList.toggle("hidden", !followupSteps.length);
-  if(followupSteps.length) renderSteps("#followup-steps", followupSteps);
-  $("#report").classList.add("hidden");
+  box.innerHTML = `<div class="panel-label">verification</div>` +
+    [...list].sort((a,b)=>(order[a.verdict]??9)-(order[b.verdict]??9)).map(v=>
+      `<div class="verdict"><span>${esc(v.issue)}${!col&&v.col?` <span class="mono" style="color:var(--accent-2)">${esc(v.col)}</span>`:""}</span>
+       <span class="v-${v.verdict} mono">${esc(v.verdict.replaceAll("_"," "))} ${esc(String(v.before))}&rarr;${esc(String(v.after))}</span></div>`).join("");
 }
 
+/* ---------- report / new ---------- */
 $("#btn-report").addEventListener("click", async ()=>{
-  const md = await (await api("/api/report")).text();
-  const pre = $("#report"); pre.textContent = md; pre.classList.remove("hidden");
+  try{
+    $("#report-pre").textContent = await (await api("/api/report")).text();
+    $("#modal").classList.remove("hidden");
+  }catch(e){ toast(e.message); }
 });
+$("#modal-close").addEventListener("click", ()=>$("#modal").classList.add("hidden"));
+$("#modal").addEventListener("click", e=>{ if(e.target.id==="modal") $("#modal").classList.add("hidden"); });
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape"){ $("#modal").classList.add("hidden"); closeDrawer(); }
+});
+$("#btn-new").addEventListener("click", ()=>location.reload());
 </script>
 </body>
 </html>

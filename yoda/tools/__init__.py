@@ -26,7 +26,8 @@ def _tool(fn):
 def drop_duplicates(df: pd.DataFrame, col: str | None = None, params: dict | None = None):
     params = params or {}
     subset = params.get("subset") or ([col] if col else None)
-    out = df.drop_duplicates(subset=subset, keep="first").reset_index(drop=True)
+    # Index is preserved (not reset) so callers can diff surviving rows.
+    out = df.drop_duplicates(subset=subset, keep="first")
     return out, {"rows_affected": len(df) - len(out)}
 
 

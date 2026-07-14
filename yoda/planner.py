@@ -203,10 +203,19 @@ class LLMPlanner:
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             return json.loads(resp.read())["message"]["content"]
 
-    def plan(self, profile: dict) -> list[dict]:
+    def plan(self, profile: dict, instruction: str | None = None,
+             col: str | None = None) -> list[dict]:
+        """`instruction` is an optional user request (e.g. "make these dates
+        ISO"); `col` scopes the plan to one column."""
+        user = "PROFILE:\n" + json.dumps(profile, indent=1)
+        if col:
+            user += (f"\n\nScope: propose steps ONLY for column '{col}' "
+                     "(plus drop_duplicates/rename_columns if clearly needed).")
+        if instruction:
+            user += f"\n\nThe user asks: {instruction}"
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": "PROFILE:\n" + json.dumps(profile, indent=1)},
+            {"role": "user", "content": user},
         ]
         errors: list[str] = []
         for attempt in range(self.max_retries):
@@ -230,6 +239,8 @@ class LLMPlanner:
                                  f"Your plan was invalid: {msg}\n"
                                  "Return a corrected JSON plan."})
         fallback = RuleBasedPlanner().plan(profile)
+        if col:
+            fallback = [s for s in fallback if s.get("col") in (col, None)]
         self.last_outcome = {"source": "fallback_rule_based",
                              "attempts": self.max_retries, "errors": errors}
         return fallback
