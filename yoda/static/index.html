@@ -6,10 +6,10 @@
 <title>YODA — Your Offline Data Agent</title>
 <style>
   :root{
-    --bg:#07090d; --surface:#0d1117; --surface-2:#11161f; --border:#1e2733;
+    --bg:#0a0c10; --surface:#101318; --surface-2:#151a21; --border:#242b36;
     --text:#e6edf3; --text-muted:#8b98a9;
-    --accent:#8b5cf6; --accent-dim:rgba(139,92,246,.12);
-    --accent-2:#22d3ee; --accent-2-dim:rgba(34,211,238,.12);
+    --accent:#2dd4bf; --accent-dim:rgba(45,212,191,.12);
+    --accent-2:#38bdf8; --accent-2-dim:rgba(56,189,248,.12);
     --ok:#22c55e; --ok-dim:rgba(34,197,94,.14);
     --warn:#facc15; --warn-dim:rgba(250,204,21,.12);
     --danger:#f87171; --danger-dim:rgba(248,113,113,.12);
@@ -39,8 +39,8 @@
          transition:border-color .18s,background .18s;min-height:40px}
   button:hover{border-color:var(--accent)}
   button:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-  button.primary:hover{background:#a78bfa}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#04211c;font-weight:600}
+  button.primary:hover{background:#5eead4}
   button.ghost{background:transparent}
   button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
   input[type=text],textarea,select{font:inherit;background:var(--bg);color:var(--text);
@@ -116,7 +116,7 @@
   table.grid{user-select:none}
   .grid td.sel{background:var(--accent-dim)!important;color:var(--text)}
   .grid tr.selrow td{background:var(--accent-dim)!important;color:var(--text)}
-  .grid tr.selrow td.rownum{background:var(--accent);color:#fff}
+  .grid tr.selrow td.rownum{background:var(--accent);color:#04211c}
   .grid td input,.grid th input{width:100%;font:inherit;background:var(--bg);
         color:var(--text);border:1px solid var(--accent);border-radius:4px;
         padding:.1rem .3rem;outline:none}
@@ -164,7 +164,7 @@
         border:1.5px solid var(--border);display:flex;align-items:center;
         justify-content:center;color:transparent;font-size:.75rem;margin-top:.1rem;
         transition:border-color .18s,background .18s,color .18s}
-  .suggestion.on .tick{background:var(--accent);border-color:var(--accent);color:#fff}
+  .suggestion.on .tick{background:var(--accent);border-color:var(--accent);color:#04211c}
   .suggestion .tool{font-family:var(--mono);font-weight:600;color:var(--accent)}
   .suggestion .on-col{font-family:var(--mono);color:var(--accent-2);font-size:.78rem}
   .suggestion .why{color:var(--text-muted);font-size:.78rem;margin-top:.15rem}
@@ -229,6 +229,7 @@
   <select class="model" id="model" aria-label="Ollama model" title="Ollama model">
     <option value="qwen3.5:4b">qwen3.5:4b</option>
   </select>
+  <button id="btn-undo" class="ghost hidden" title="Undo last manual edit (Ctrl+Z)">Undo</button>
   <button id="btn-clean-all" class="primary hidden">Clean everything</button>
   <button id="btn-report" class="ghost hidden">Report</button>
   <a id="dl" href="/api/download" download class="hidden"><button class="ghost">Download CSV</button></a>
@@ -495,9 +496,21 @@ async function manualEdit(body, msg){
     state.grid = d.grid; clearSel(); renderGrid();
     $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
     ["#btn-report","#dl"].forEach(s=>$(s).classList.remove("hidden"));
+    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
     toast(msg);
   }catch(e){ toast("Edit failed: "+e.message); }
 }
+
+async function doUndo(){
+  try{
+    const d = await (await api("/api/undo",{method:"POST"})).json();
+    state.grid = d.grid; clearSel(); renderGrid();
+    $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
+    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+    toast(d.undo_depth ? `undone (${d.undo_depth} more)` : "undone — history empty");
+  }catch(err){ toast(err.message); }
+}
+$("#btn-undo").addEventListener("click", doUndo);
 
 /* keyboard: Delete clears/removes selection, Ctrl+Z undoes */
 document.addEventListener("keydown", async e=>{
@@ -514,13 +527,7 @@ document.addEventListener("keydown", async e=>{
         `cleared ${cells.length} cell(s) — Ctrl+Z to undo`);
     }
   }else if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z"){
-    e.preventDefault();
-    try{
-      const d = await (await api("/api/undo",{method:"POST"})).json();
-      state.grid = d.grid; clearSel(); renderGrid();
-      $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
-      toast(d.undo_depth ? `undone (${d.undo_depth} more)` : "undone — history empty");
-    }catch(err){ toast(err.message); }
+    e.preventDefault(); doUndo();
   }else if(e.key==="Escape"){ clearSel(); }
 });
 
@@ -578,12 +585,18 @@ function renderDrawer(wholeTable=false){
     </div>
     <div class="notebox">The model receives only redacted statistics + your instruction —
       never your data.</div>
-    <div id="think" class="hidden thinking"><span class="spinner"></span><span id="think-word"></span></div>
+    <div id="think" class="hidden thinking"><span class="spinner"></span>
+      <span id="think-word" class="grow"></span>
+      <button class="ghost" id="btn-cancel"
+              style="min-height:30px;padding:.15rem .7rem;font-size:.75rem">Cancel</button></div>
     <div id="sugg-error"></div>
     <div id="sugg-box"></div>
     <div id="verdict-box"></div>`;
   body.innerHTML = html;
   $("#btn-suggest").addEventListener("click", ()=>suggest(col));
+  $("#instruction").addEventListener("keydown", e=>{
+    if((e.ctrlKey||e.metaKey) && e.key==="Enter"){ e.preventDefault(); suggest(col); }
+  });
   renderVerdicts();
 }
 
@@ -603,13 +616,17 @@ function startThinking(){
 }
 function stopThinking(){ clearInterval(actionTimer); $("#think")?.classList.add("hidden"); }
 
+let suggestAbort = null;
 async function suggest(col){
   if(state.busy) return; state.busy = true;
   $("#sugg-error").innerHTML = ""; $("#sugg-box").innerHTML = "";
   $("#btn-suggest").disabled = true; startThinking();
+  suggestAbort = new AbortController();
+  $("#btn-cancel").onclick = ()=>suggestAbort.abort();
   try{
     const d = await (await api("/api/plan",{method:"POST",
       headers:{"Content-Type":"application/json"},
+      signal: suggestAbort.signal,
       body:JSON.stringify({model:$("#model").value, col,
                            instruction:$("#instruction").value.trim()})})).json();
     state.suggestions = d.steps;
@@ -617,7 +634,11 @@ async function suggest(col){
       ? "model failed — deterministic fallback"
       : `${$("#model").value} · valid in ${d.outcome.attempts} attempt(s)`;
     renderSuggestions(src);
-  }catch(e){ $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  }catch(e){
+    if(e.name==="AbortError") toast("Cancelled — no changes were made");
+    else $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`;
+  }
+  suggestAbort = null;
   stopThinking(); $("#btn-suggest").disabled = false; state.busy = false;
 }
 
