@@ -113,6 +113,13 @@
   .grid tbody tr:hover td{background:rgba(139,92,246,.05)}
   .grid td.changed{background:var(--ok-dim);color:var(--ok)}
   .grid td.newcell{background:var(--accent-2-dim);color:var(--accent-2)}
+  table.grid{user-select:none}
+  .grid td.sel{background:var(--accent-dim)!important;color:var(--text)}
+  .grid tr.selrow td{background:var(--accent-dim)!important;color:var(--text)}
+  .grid tr.selrow td.rownum{background:var(--accent);color:#fff}
+  .grid td input,.grid th input{width:100%;font:inherit;background:var(--bg);
+        color:var(--text);border:1px solid var(--accent);border-radius:4px;
+        padding:.1rem .3rem;outline:none}
 
   /* legend + status bar */
   .statusbar{display:flex;gap:1.1rem;align-items:center;padding:.45rem 1.1rem;
@@ -347,13 +354,13 @@ function renderGrid(){
               ${esc(c)}${n?`<span class="cnt">${n}</span>`:""}</th>`;
   });
   html += "</tr></thead><tbody>";
-  g.rows.forEach(r=>{
-    html += `<tr><td class="rownum">${r.rid+1}</td>`;
+  g.rows.forEach((r,ri)=>{
+    html += `<tr data-r="${ri}" data-rid="${r.rid}"><td class="rownum">${r.rid+1}</td>`;
     r.cells.forEach((v,ci)=>{
       const col = g.columns[ci];
       const cls = newCols.has(col) ? "newcell"
         : (changed[col]||[]).includes(r.rid) ? "changed" : "";
-      html += `<td class="${cls}" title="${esc(v)}">${esc(v)}</td>`;
+      html += `<td class="${cls}" data-c="${ci}" title="${esc(v)}">${esc(v)}</td>`;
     });
     html += "</tr>";
   });
@@ -362,8 +369,160 @@ function renderGrid(){
   table.querySelectorAll("thead th[data-col]").forEach(th=>{
     th.addEventListener("click", ()=>openColumn(th.dataset.col));
     th.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openColumn(th.dataset.col);}});
+    th.addEventListener("dblclick", e=>{e.stopPropagation();renameColInline(th);});
   });
+  applySelection();
 }
+
+/* ---------- excel-style selection & editing ---------- */
+const sel = {mode:null, r1:0, c1:0, r2:0, c2:0, rows:new Set(), lastRow:null};
+let dragging = false, editing = false;
+
+function clearSel(){ sel.mode = null; sel.rows.clear(); applySelection(); }
+function applySelection(){
+  const table = $("#grid");
+  table.querySelectorAll("td.sel").forEach(td=>td.classList.remove("sel"));
+  table.querySelectorAll("tr.selrow").forEach(tr=>tr.classList.remove("selrow"));
+  if(sel.mode==="cells"){
+    const [ra,rb] = [Math.min(sel.r1,sel.r2), Math.max(sel.r1,sel.r2)];
+    const [ca,cb] = [Math.min(sel.c1,sel.c2), Math.max(sel.c1,sel.c2)];
+    table.querySelectorAll("tbody tr").forEach(tr=>{
+      const r = +tr.dataset.r;
+      if(r<ra||r>rb) return;
+      tr.querySelectorAll("td[data-c]").forEach(td=>{
+        const c = +td.dataset.c;
+        if(c>=ca && c<=cb) td.classList.add("sel");
+      });
+    });
+  }else if(sel.mode==="rows"){
+    table.querySelectorAll("tbody tr").forEach(tr=>{
+      if(sel.rows.has(+tr.dataset.rid)) tr.classList.add("selrow");
+    });
+  }
+}
+function selectedCells(){
+  if(sel.mode!=="cells") return [];
+  const g = state.grid, out = [];
+  const [ra,rb] = [Math.min(sel.r1,sel.r2), Math.max(sel.r1,sel.r2)];
+  const [ca,cb] = [Math.min(sel.c1,sel.c2), Math.max(sel.c1,sel.c2)];
+  for(let r=ra;r<=rb;r++) for(let c=ca;c<=cb;c++)
+    if(g.rows[r]) out.push({rid:g.rows[r].rid, col:g.columns[c]});
+  return out;
+}
+
+const gridEl = $("#grid");
+gridEl.addEventListener("mousedown", e=>{
+  if(editing || e.button!==0) return;
+  const td = e.target.closest("td");
+  if(!td) return;
+  const tr = td.closest("tr");
+  if(td.classList.contains("rownum")){
+    const rid = +tr.dataset.rid;
+    if(e.ctrlKey && sel.mode==="rows"){ sel.rows.has(rid)?sel.rows.delete(rid):sel.rows.add(rid); }
+    else if(e.shiftKey && sel.mode==="rows" && sel.lastRow!==null){
+      const rows = [...gridEl.querySelectorAll("tbody tr")];
+      const a = rows.findIndex(r=>+r.dataset.rid===sel.lastRow);
+      const b = rows.findIndex(r=>+r.dataset.rid===rid);
+      for(let i=Math.min(a,b);i<=Math.max(a,b);i++) sel.rows.add(+rows[i].dataset.rid);
+    }else{ sel.mode="rows"; sel.rows = new Set([rid]); }
+    sel.mode="rows"; sel.lastRow = rid; applySelection();
+  }else if(td.dataset.c!==undefined){
+    sel.mode="cells"; dragging = true;
+    sel.r1 = sel.r2 = +tr.dataset.r; sel.c1 = sel.c2 = +td.dataset.c;
+    applySelection();
+  }
+});
+gridEl.addEventListener("mouseover", e=>{
+  if(!dragging) return;
+  const td = e.target.closest("td[data-c]");
+  if(!td) return;
+  sel.r2 = +td.closest("tr").dataset.r; sel.c2 = +td.dataset.c;
+  applySelection();
+});
+window.addEventListener("mouseup", ()=>{ dragging = false; });
+
+/* double-click to edit a cell */
+gridEl.addEventListener("dblclick", e=>{
+  const td = e.target.closest("td[data-c]");
+  if(td) editCellInline(td);
+});
+function editCellInline(td){
+  if(editing) return; editing = true;
+  const tr = td.closest("tr");
+  const rid = +tr.dataset.rid, col = state.grid.columns[+td.dataset.c];
+  const old = td.textContent;
+  td.innerHTML = `<input type="text" value="${esc(old)}" aria-label="Edit ${esc(col)} row ${rid+1}">`;
+  const inp = td.querySelector("input"); inp.focus(); inp.select();
+  const done = async (commit)=>{
+    if(!editing) return; editing = false;
+    const v = inp.value;
+    td.textContent = old;
+    if(commit && v!==old) await manualEdit({op:"cell", rid, col, value:v},
+      `edited ${col} — Ctrl+Z to undo`);
+  };
+  inp.addEventListener("keydown", e=>{
+    if(e.key==="Enter") done(true);
+    else if(e.key==="Escape") done(false);
+    e.stopPropagation();
+  });
+  inp.addEventListener("blur", ()=>done(true));
+}
+function renameColInline(th){
+  if(editing) return; editing = true;
+  const col = th.dataset.col, old = col;
+  th.innerHTML = `<input type="text" value="${esc(old)}" aria-label="Rename column ${esc(old)}">`;
+  const inp = th.querySelector("input"); inp.focus(); inp.select();
+  const done = async (commit)=>{
+    if(!editing) return; editing = false;
+    const v = inp.value.trim();
+    if(commit && v && v!==old)
+      await manualEdit({op:"rename_col", col:old, new:v}, `renamed to ${v} — Ctrl+Z to undo`);
+    else renderGrid();
+  };
+  inp.addEventListener("keydown", e=>{
+    if(e.key==="Enter") done(true);
+    else if(e.key==="Escape") done(false);
+    e.stopPropagation();
+  });
+  inp.addEventListener("blur", ()=>done(true));
+  inp.addEventListener("click", e=>e.stopPropagation());
+}
+
+async function manualEdit(body, msg){
+  try{
+    const d = await (await api("/api/edit",{method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})).json();
+    state.grid = d.grid; clearSel(); renderGrid();
+    $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
+    ["#btn-report","#dl"].forEach(s=>$(s).classList.remove("hidden"));
+    toast(msg);
+  }catch(e){ toast("Edit failed: "+e.message); }
+}
+
+/* keyboard: Delete clears/removes selection, Ctrl+Z undoes */
+document.addEventListener("keydown", async e=>{
+  if(editing || e.target.matches("input,textarea,select")) return;
+  if(e.key==="Delete" || e.key==="Backspace"){
+    if(sel.mode==="rows" && sel.rows.size){
+      e.preventDefault();
+      manualEdit({op:"delete_rows", rids:[...sel.rows]},
+        `deleted ${sel.rows.size} row(s) — Ctrl+Z to undo`);
+    }else if(sel.mode==="cells"){
+      e.preventDefault();
+      const cells = selectedCells();
+      manualEdit({op:"clear_cells", cells},
+        `cleared ${cells.length} cell(s) — Ctrl+Z to undo`);
+    }
+  }else if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z"){
+    e.preventDefault();
+    try{
+      const d = await (await api("/api/undo",{method:"POST"})).json();
+      state.grid = d.grid; clearSel(); renderGrid();
+      $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
+      toast(d.undo_depth ? `undone (${d.undo_depth} more)` : "undone — history empty");
+    }catch(err){ toast(err.message); }
+  }else if(e.key==="Escape"){ clearSel(); }
+});
 
 /* ---------- sidebar open/close ---------- */
 function setDrawer(open){
@@ -590,7 +749,9 @@ function showCtx(x, y, col){
       html += `<button class="item" data-quick="${i}">${t.label}
                <span class="mono-tag">${t.tool}</span></button>`;
     });
-    html += `<hr><button class="item" data-act="copy">Copy column name</button>`;
+    html += `<hr><button class="item" data-act="rename">Rename column&hellip;</button>
+             <button class="item" data-act="delcol">Delete column</button>
+             <button class="item" data-act="copy">Copy column name</button>`;
   }else{
     html += `<button class="item" data-act="cleanall">Clean everything (AI)&hellip;</button><hr>`;
     TABLE_TOOLS.forEach((t,i)=>{
@@ -598,6 +759,10 @@ function showCtx(x, y, col){
                <span class="mono-tag">${t.tool}</span></button>`;
     });
   }
+  if(sel.mode==="rows" && sel.rows.size)
+    html += `<hr><button class="item" data-act="delrows">Delete ${sel.rows.size} selected row(s)</button>`;
+  if(sel.mode==="cells")
+    html += `<hr><button class="item" data-act="clearcells">Clear selected cell(s)</button>`;
   ctxEl.innerHTML = html;
   document.body.appendChild(ctxEl);
   const r = ctxEl.getBoundingClientRect();
@@ -612,6 +777,21 @@ function showCtx(x, y, col){
       else if(act==="suggest"){ openColumn(col); suggest(col); }
       else if(act==="cleanall"){ $("#btn-clean-all").click(); }
       else if(act==="copy"){ navigator.clipboard?.writeText(col); toast("Copied: "+col); }
+      else if(act==="rename"){
+        const th = $(`#grid thead th[data-col="${CSS.escape(col)}"]`);
+        if(th) renameColInline(th);
+      }
+      else if(act==="delcol"){
+        manualEdit({op:"delete_col", col}, `deleted column ${col} — Ctrl+Z to undo`);
+      }
+      else if(act==="delrows"){
+        manualEdit({op:"delete_rows", rids:[...sel.rows]},
+          `deleted ${sel.rows.size} row(s) — Ctrl+Z to undo`);
+      }
+      else if(act==="clearcells"){
+        const cells = selectedCells();
+        manualEdit({op:"clear_cells", cells}, `cleared ${cells.length} cell(s) — Ctrl+Z to undo`);
+      }
       else if(quick!==undefined){ quickAction(col, QUICK_TOOLS[+quick]); }
       else if(table!==undefined){ quickAction(null, TABLE_TOOLS[+table]); }
     });

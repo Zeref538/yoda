@@ -212,6 +212,120 @@ def run(body: dict):
     }
 
 
+def _push_history():
+    S.setdefault("history", [])
+    S["history"].append(S["cleaned"].copy())
+    del S["history"][:-20]  # cap memory
+
+
+def _log_manual(entry: dict):
+    """Manual edits land in one rolling 'manual edits' round for the report."""
+    rounds = S.setdefault("rounds", [])
+    if not rounds or not rounds[-1].get("manual"):
+        rounds.append({"plan": [], "audit": [], "manual": True})
+    entry.setdefault("status", "ok")
+    entry["step"] = len(rounds[-1]["audit"])
+    rounds[-1]["audit"].append(entry)
+
+
+def _parse_value(series: pd.Series, value: str):
+    if value == "":
+        return pd.NA
+    if pd.api.types.is_numeric_dtype(series):
+        try:
+            return float(value) if "." in value else int(value)
+        except ValueError:
+            pass  # falls through: column becomes object, like Excel would
+    return value
+
+
+@app.post("/api/edit")
+def edit(body: dict):
+    """Direct user edits — Excel-style, no AI, no approval gate needed
+    (the user IS the action). Everything is undoable and audit-logged."""
+    if S.get("cleaned") is None:
+        raise HTTPException(400, "upload a file first")
+    df = S["cleaned"]
+    op = body.get("op")
+    _push_history()
+    changed: dict[str, list] = {}
+    removed: list = []
+
+    try:
+        if op == "cell":
+            rid, col, val = body["rid"], body["col"], str(body.get("value", ""))
+            if col not in df.columns or rid not in df.index:
+                raise KeyError(f"{col}[{rid}]")
+            out = df.copy()
+            if pd.api.types.is_numeric_dtype(out[col]) and not isinstance(
+                    _parse_value(out[col], val), (int, float)):
+                out[col] = out[col].astype(object)
+            out.at[rid, col] = _parse_value(out[col], val)
+            changed = {col: [int(rid)]}
+            _log_manual({"tool": "manual_edit_cell", "col": col,
+                         "rows_affected": 1, "reason": "user edited a cell"})
+        elif op == "clear_cells":
+            out = df.copy()
+            n = 0
+            for c in body["cells"]:
+                rid, col = c["rid"], c["col"]
+                if col in out.columns and rid in out.index:
+                    if not pd.api.types.is_object_dtype(out[col]) and not \
+                            pd.api.types.is_float_dtype(out[col]):
+                        out[col] = out[col].astype(object)
+                    out.at[rid, col] = pd.NA
+                    changed.setdefault(col, []).append(int(rid))
+                    n += 1
+            _log_manual({"tool": "manual_clear_cells", "col": None,
+                         "rows_affected": n, "reason": "user cleared cells"})
+        elif op == "delete_rows":
+            rids = [r for r in body["rids"] if r in df.index]
+            out = df.drop(index=rids)
+            removed = rids
+            _log_manual({"tool": "manual_delete_rows", "col": None,
+                         "rows_affected": len(rids), "reason": "user deleted rows"})
+        elif op == "delete_col":
+            col = body["col"]
+            if col not in df.columns:
+                raise KeyError(col)
+            out = df.drop(columns=[col])
+            _log_manual({"tool": "manual_delete_column", "col": col,
+                         "rows_affected": len(df), "reason": "user deleted a column"})
+        elif op == "rename_col":
+            old, new = body["col"], str(body["new"]).strip()
+            if old not in df.columns:
+                raise KeyError(old)
+            if not new or new in df.columns:
+                raise HTTPException(400, f"invalid or duplicate name: '{new}'")
+            out = df.rename(columns={old: new})
+            _log_manual({"tool": "manual_rename_column", "col": old,
+                         "rows_affected": 0,
+                         "reason": f"user renamed column to '{new}'"})
+        else:
+            raise HTTPException(400, f"unknown edit op: {op}")
+    except KeyError as exc:
+        S["history"].pop()
+        raise HTTPException(400, f"not found: {exc}")
+
+    S["cleaned"] = out
+    return {"grid": _grid(out, changed, [], removed),
+            "n_rows": len(out), "undo_depth": len(S["history"])}
+
+
+@app.post("/api/undo")
+def undo():
+    if not S.get("history"):
+        raise HTTPException(400, "nothing to undo")
+    S["cleaned"] = S["history"].pop()
+    if S.get("rounds") and S["rounds"][-1].get("manual"):
+        if S["rounds"][-1]["audit"]:
+            S["rounds"][-1]["audit"].pop()
+        if not S["rounds"][-1]["audit"]:
+            S["rounds"].pop()
+    return {"grid": _grid(S["cleaned"]), "n_rows": len(S["cleaned"]),
+            "undo_depth": len(S["history"])}
+
+
 @app.get("/api/report")
 def report():
     if not S.get("rounds"):

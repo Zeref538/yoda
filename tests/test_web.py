@@ -56,6 +56,44 @@ def test_execute_rejects_invalid_plan(uploaded):
     assert r.status_code == 400
 
 
+def test_manual_edits_and_undo(uploaded):
+    # edit a cell
+    r = client.post("/api/edit", json={"op": "cell", "rid": 0,
+                                       "col": "city", "value": "Taguig"})
+    assert r.status_code == 200
+    assert r.json()["grid"]["changed"] == {"city": [0]}
+
+    # rename + delete column
+    assert client.post("/api/edit", json={"op": "rename_col", "col": "segment",
+                                          "new": "tier"}).status_code == 200
+    d = client.post("/api/edit", json={"op": "delete_col", "col": "tier"}).json()
+    assert "tier" not in d["grid"]["columns"]
+
+    # delete rows
+    d = client.post("/api/edit", json={"op": "delete_rows", "rids": [0, 1]}).json()
+    assert d["n_rows"] == 108 and set(d["grid"]["removed_rids"]) == {0, 1}
+
+    # clear cells
+    d = client.post("/api/edit", json={"op": "clear_cells",
+                                       "cells": [{"rid": 2, "col": "email"}]}).json()
+    assert d["grid"]["changed"] == {"email": [2]}
+
+    # undo everything back to the original upload
+    for _ in range(4):
+        d = client.post("/api/undo").json()
+    assert d["n_rows"] == 110 and d["undo_depth"] == 1
+    assert client.post("/api/undo").json()["undo_depth"] == 0
+    assert client.post("/api/undo").status_code == 400
+
+
+def test_edit_rejects_bad_targets(uploaded):
+    assert client.post("/api/edit", json={"op": "cell", "rid": 0, "col": "ghost",
+                                          "value": "x"}).status_code == 400
+    assert client.post("/api/edit", json={"op": "rename_col", "col": "city",
+                                          "new": "email"}).status_code == 400
+    assert client.post("/api/edit", json={"op": "nope"}).status_code == 400
+
+
 def test_upload_required_first():
     S.clear()
     assert client.post("/api/plan", json={}).status_code == 400
