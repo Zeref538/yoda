@@ -128,7 +128,7 @@ def clean(
     console.print(f"Report:       [bold]{report_path}[/bold]")
 
 
-@app.command()
+@app.command("profile")
 def profile_cmd(
     path: str = typer.Argument(..., help="File to profile"),
     table: str = typer.Option(None, help="Table name (SQLite inputs)"),
