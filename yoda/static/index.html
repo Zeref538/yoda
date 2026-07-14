@@ -229,7 +229,8 @@
   <select class="model" id="model" aria-label="Ollama model" title="Ollama model">
     <option value="qwen3.5:4b">qwen3.5:4b</option>
   </select>
-  <button id="btn-undo" class="ghost hidden" title="Undo last manual edit (Ctrl+Z)">Undo</button>
+  <button id="btn-undo" class="ghost hidden" title="Undo last change (Ctrl+Z)">Undo</button>
+  <button id="btn-history" class="ghost hidden" title="Timeline and saved versions">History</button>
   <button id="btn-clean-all" class="primary hidden">Clean everything</button>
   <button id="btn-report" class="ghost hidden">Report</button>
   <a id="dl" href="/api/download" download class="hidden"><button class="ghost">Download CSV</button></a>
@@ -285,6 +286,24 @@
   <span class="chip hidden legend"><span class="sw warn"></span>issues in column</span>
 </div>
 
+<div class="modal hidden" id="hist-modal">
+  <div class="inner" style="max-width:38rem">
+    <header><div class="logo">history &amp; versions</div><div class="grow"></div>
+      <button class="ghost" id="hist-close" aria-label="Close history">&#10005;</button></header>
+    <div style="flex:1;overflow:auto;padding:1.1rem;display:flex;flex-direction:column;gap:1rem">
+      <div class="panel-label">timeline — revert to any point</div>
+      <div id="timeline-box" style="display:flex;flex-direction:column;gap:.45rem"></div>
+      <div class="panel-label">versions — named copies, original untouched</div>
+      <div style="display:flex;gap:.6rem">
+        <input type="text" id="version-name" placeholder="version name, e.g. before-dedupe"
+               style="flex:1" aria-label="New version name">
+        <button class="primary" id="btn-save-version">Save version</button>
+      </div>
+      <div id="versions-box" style="display:flex;flex-direction:column;gap:.45rem"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal hidden" id="modal">
   <div class="inner">
     <header><div class="logo">cleaning report</div><div class="grow"></div>
@@ -330,7 +349,8 @@ async function upload(file){
     state.grid = d.grid; state.issues = d.issues; state.rounds = 0;
     state.verdicts = []; state.followup = []; state.suggestions = [];
     $("#filechip").textContent = `${d.name} · ${d.n_rows}×${d.n_cols}`;
-    ["#filechip","#btn-clean-all","#btn-new"].forEach(s=>$(s).classList.remove("hidden"));
+    ["#filechip","#btn-clean-all","#btn-new","#btn-history"].forEach(s=>$(s).classList.remove("hidden"));
+    $("#btn-undo").classList.add("hidden");
     $("#empty").classList.add("hidden"); $("#grid").classList.remove("hidden");
     document.querySelectorAll(".legend").forEach(el=>el.classList.remove("hidden"));
     renderGrid();
@@ -707,6 +727,7 @@ async function applyApproved(){
       `${d.n_rows_after} rows remain`;
     $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows_after+"×");
     ["#btn-report","#dl"].forEach(s=>$(s).classList.remove("hidden"));
+    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
     toast(`Applied ${steps.length} step(s) — ${changed} cells changed`);
     state.suggestions = d.followup || [];
     const box = $("#sugg-box");
@@ -831,6 +852,86 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   showCtx(e.clientX, e.clientY, col || null);
 });
 
+/* ---------- history & versions ---------- */
+const KIND_COLOR = {upload:"var(--accent-2)", ai:"var(--accent)",
+                    manual:"var(--warn)", revert:"var(--text-muted)"};
+function histRow(inner){ return `<div class="issue-line" style="align-items:center">${inner}</div>`; }
+
+async function openHistory(){
+  try{
+    const h = await (await api("/api/history")).json();
+    const tl = $("#timeline-box");
+    tl.innerHTML = [...h.timeline].reverse().map((e,idx)=>{
+      const current = idx===0;
+      return histRow(
+        `<span><span class="mono" style="color:${KIND_COLOR[e.kind]||"var(--text)"}">${esc(e.kind)}</span>
+          ${esc(e.label)} <span class="mono" style="color:var(--text-muted);font-size:.7rem">${e.n_rows} rows · ${esc(e.ts.slice(11))}</span></span>
+         ${current ? `<span class="mono" style="color:var(--ok)">current</span>`
+                   : `<button class="ghost" data-revert="${e.id}"
+                        style="min-height:30px;padding:.15rem .7rem;font-size:.75rem">
+                        ${e.id===0?"Revert to original":"Revert"}</button>`}`);
+    }).join("");
+    tl.querySelectorAll("[data-revert]").forEach(b=>
+      b.addEventListener("click", ()=>revertTo(+b.dataset.revert)));
+    renderVersions(h.versions);
+    $("#hist-modal").classList.remove("hidden");
+  }catch(e){ toast(e.message); }
+}
+function renderVersions(versions){
+  const box = $("#versions-box");
+  box.innerHTML = versions.length ? versions.map(v=>histRow(
+    `<span class="mono" style="color:var(--accent-2)">${esc(v.name)}
+       <span style="color:var(--text-muted);font-size:.7rem">${v.n_rows} rows · ${esc(v.ts.slice(11))}</span></span>
+     <span style="display:flex;gap:.4rem">
+       <a href="/api/download?version=${encodeURIComponent(v.name)}" download>
+         <button class="ghost" style="min-height:30px;padding:.15rem .7rem;font-size:.75rem">Download</button></a>
+       <button class="ghost" data-restore="${esc(v.name)}"
+         style="min-height:30px;padding:.15rem .7rem;font-size:.75rem">Restore</button></span>`)).join("")
+    : histRow(`<span style="color:var(--text-muted)">no versions saved yet</span><span></span>`);
+  box.querySelectorAll("[data-restore]").forEach(b=>
+    b.addEventListener("click", async ()=>{
+      try{
+        const d = await (await api("/api/version/restore",{method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({name:b.dataset.restore})})).json();
+        afterStateChange(d, `restored version '${b.dataset.restore}'`);
+        $("#hist-modal").classList.add("hidden");
+      }catch(e){ toast(e.message); }
+    }));
+}
+async function revertTo(id){
+  try{
+    const d = await (await api("/api/revert",{method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({id})})).json();
+    afterStateChange(d, id===0 ? "reverted to the original file" : "reverted");
+    $("#hist-modal").classList.add("hidden");
+  }catch(e){ toast(e.message); }
+}
+function afterStateChange(d, msg){
+  state.grid = d.grid; clearSel(); renderGrid();
+  $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
+  $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+  ["#btn-report","#dl"].forEach(s=>$(s).classList.remove("hidden"));
+  toast(msg + " — Ctrl+Z to step back");
+}
+$("#btn-history").addEventListener("click", openHistory);
+$("#hist-close").addEventListener("click", ()=>$("#hist-modal").classList.add("hidden"));
+$("#hist-modal").addEventListener("click", e=>{
+  if(e.target.id==="hist-modal") $("#hist-modal").classList.add("hidden"); });
+$("#btn-save-version").addEventListener("click", async ()=>{
+  const name = $("#version-name").value.trim();
+  if(!name){ toast("Give the version a name first."); return; }
+  try{
+    const d = await (await api("/api/version",{method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({name})})).json();
+    $("#version-name").value = "";
+    renderVersions(d.versions);
+    toast(`version '${name}' saved`);
+  }catch(e){ toast(e.message); }
+});
+$("#version-name").addEventListener("keydown", e=>{
+  if(e.key==="Enter") $("#btn-save-version").click(); });
+
 /* ---------- report / new ---------- */
 $("#btn-report").addEventListener("click", async ()=>{
   try{
@@ -841,7 +942,10 @@ $("#btn-report").addEventListener("click", async ()=>{
 $("#modal-close").addEventListener("click", ()=>$("#modal").classList.add("hidden"));
 $("#modal").addEventListener("click", e=>{ if(e.target.id==="modal") $("#modal").classList.add("hidden"); });
 document.addEventListener("keydown", e=>{
-  if(e.key==="Escape"){ $("#modal").classList.add("hidden"); closeDrawer(); }
+  if(e.key==="Escape"){
+    $("#modal").classList.add("hidden");
+    $("#hist-modal").classList.add("hidden");
+  }
 });
 $("#btn-new").addEventListener("click", ()=>location.reload());
 </script>

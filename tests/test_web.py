@@ -79,11 +79,35 @@ def test_manual_edits_and_undo(uploaded):
     assert d["grid"]["changed"] == {"email": [2]}
 
     # undo everything back to the original upload
-    for _ in range(4):
+    for _ in range(5):
         d = client.post("/api/undo").json()
-    assert d["n_rows"] == 110 and d["undo_depth"] == 1
-    assert client.post("/api/undo").json()["undo_depth"] == 0
+    assert d["n_rows"] == 110 and d["undo_depth"] == 0
     assert client.post("/api/undo").status_code == 400
+
+
+def test_history_revert_and_versions(uploaded):
+    client.post("/api/edit", json={"op": "delete_rows", "rids": [0, 1, 2]})
+    client.post("/api/version", json={"name": "trimmed"})
+    client.post("/api/edit", json={"op": "delete_col", "col": "city"})
+
+    h = client.get("/api/history").json()
+    assert [e["kind"] for e in h["timeline"]] == ["upload", "manual", "manual"]
+    assert h["versions"][0]["name"] == "trimmed"
+
+    # revert to the original upload (id 0) — non-destructive, appends an entry
+    d = client.post("/api/revert", json={"id": 0}).json()
+    assert d["n_rows"] == 110
+    assert "city" in d["grid"]["columns"]
+    assert d["timeline"][-1]["kind"] == "revert"
+
+    # restore the saved version
+    d = client.post("/api/version/restore", json={"name": "trimmed"}).json()
+    assert d["n_rows"] == 107
+
+    # download a specific version
+    assert client.get("/api/download?version=trimmed").status_code == 200
+    assert client.get("/api/download?version=nope").status_code == 400
+    assert client.post("/api/revert", json={"id": 999}).status_code == 400
 
 
 def test_edit_rejects_bad_targets(uploaded):

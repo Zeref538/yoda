@@ -148,7 +148,8 @@ async def upload(file: UploadFile = File(...)):
     prof = profile(df)
     S.clear()
     S.update(df=df, cleaned=df, prof=prof, name=file.filename, rounds=[],
-             planner=None, new_prof=prof, verdicts=[])
+             planner=None, new_prof=prof, verdicts=[], versions={})
+    _snapshot("original upload", "upload")
     return {
         "name": file.filename, "n_rows": len(df), "n_cols": len(df.columns),
         "issues": _issues(prof),
@@ -202,6 +203,7 @@ def run(body: dict):
     S["verdicts"], S["new_prof"] = verdicts, new_prof
     followup = ([] if len(S["rounds"]) >= 4 or S["planner"] is None
                 else follow_up_plan(verdicts, S["planner"], new_prof))
+    _snapshot(f"AI round {len(S['rounds'])}: {len(steps)} step(s)", "ai")
     return {
         "audit": json.loads(json.dumps(audit, default=str)),
         "verdicts": verdicts,
@@ -209,13 +211,25 @@ def run(body: dict):
         "round": len(S["rounds"]),
         "n_rows_before": len(S["df"]), "n_rows_after": len(cleaned),
         "grid": _grid(cleaned, changed, new_cols, removed),
+        "undo_depth": len(S["timeline"]) - 1,
     }
 
 
-def _push_history():
-    S.setdefault("history", [])
-    S["history"].append(S["cleaned"].copy())
-    del S["history"][:-20]  # cap memory
+def _snapshot(label: str, kind: str):
+    """Append the current dataframe to the timeline (single undo/history
+    source of truth). Entry 0 — the original upload — is never dropped."""
+    tl = S.setdefault("timeline", [])
+    tl.append({"id": (tl[-1]["id"] + 1) if tl else 0, "label": label,
+               "kind": kind, "ts": pd.Timestamp.now().isoformat(timespec="seconds"),
+               "df": S["cleaned"].copy(), "rounds_len": len(S.get("rounds", [])),
+               "n_rows": len(S["cleaned"])})
+    if len(tl) > 40:  # cap memory, keep the original
+        del tl[1:len(tl) - 39]
+
+
+def _timeline_meta():
+    return [{k: e[k] for k in ("id", "label", "kind", "ts", "n_rows")}
+            for e in S.get("timeline", [])]
 
 
 def _log_manual(entry: dict):
@@ -247,9 +261,11 @@ def edit(body: dict):
         raise HTTPException(400, "upload a file first")
     df = S["cleaned"]
     op = body.get("op")
-    _push_history()
     changed: dict[str, list] = {}
     removed: list = []
+    label = {"cell": "edited a cell", "clear_cells": "cleared cells",
+             "delete_rows": "deleted rows", "delete_col": "deleted a column",
+             "rename_col": "renamed a column"}.get(op, op)
 
     try:
         if op == "cell":
@@ -304,26 +320,79 @@ def edit(body: dict):
         else:
             raise HTTPException(400, f"unknown edit op: {op}")
     except KeyError as exc:
-        S["history"].pop()
         raise HTTPException(400, f"not found: {exc}")
 
     S["cleaned"] = out
+    _snapshot(label, "manual")
     return {"grid": _grid(out, changed, [], removed),
-            "n_rows": len(out), "undo_depth": len(S["history"])}
+            "n_rows": len(out), "undo_depth": len(S["timeline"]) - 1}
 
 
 @app.post("/api/undo")
 def undo():
-    if not S.get("history"):
+    tl = S.get("timeline", [])
+    if len(tl) <= 1:
         raise HTTPException(400, "nothing to undo")
-    S["cleaned"] = S["history"].pop()
-    if S.get("rounds") and S["rounds"][-1].get("manual"):
-        if S["rounds"][-1]["audit"]:
-            S["rounds"][-1]["audit"].pop()
-        if not S["rounds"][-1]["audit"]:
-            S["rounds"].pop()
+    tl.pop()
+    S["cleaned"] = tl[-1]["df"].copy()
+    del S["rounds"][tl[-1]["rounds_len"]:]  # drop audit of the undone step
     return {"grid": _grid(S["cleaned"]), "n_rows": len(S["cleaned"]),
-            "undo_depth": len(S["history"])}
+            "undo_depth": len(tl) - 1}
+
+
+@app.get("/api/history")
+def history():
+    if "timeline" not in S:
+        raise HTTPException(400, "upload a file first")
+    return {"timeline": _timeline_meta(),
+            "versions": [{"name": n, "ts": v["ts"], "n_rows": len(v["df"])}
+                         for n, v in S.get("versions", {}).items()]}
+
+
+@app.post("/api/revert")
+def revert(body: dict):
+    """Jump to any timeline entry (id 0 = the original upload). The revert is
+    itself appended to the timeline, so it's non-destructive and undoable."""
+    tl = S.get("timeline", [])
+    entry = next((e for e in tl if e["id"] == body.get("id")), None)
+    if entry is None:
+        raise HTTPException(400, "unknown history entry")
+    S["cleaned"] = entry["df"].copy()
+    _log_manual({"tool": "revert", "col": None, "rows_affected": len(S["cleaned"]),
+                 "reason": f"user reverted to '{entry['label']}'"})
+    _snapshot(f"reverted to: {entry['label']}", "revert")
+    return {"grid": _grid(S["cleaned"]), "n_rows": len(S["cleaned"]),
+            "undo_depth": len(tl) - 1, "timeline": _timeline_meta()}
+
+
+@app.post("/api/version")
+def save_version(body: dict):
+    """Save the current state as a named copy; the working data (and the
+    original) are untouched. Versions are downloadable and restorable."""
+    if S.get("cleaned") is None:
+        raise HTTPException(400, "upload a file first")
+    name = str(body.get("name", "")).strip()
+    if not name:
+        raise HTTPException(400, "version needs a name")
+    S.setdefault("versions", {})[name] = {
+        "df": S["cleaned"].copy(),
+        "ts": pd.Timestamp.now().isoformat(timespec="seconds")}
+    return {"versions": [{"name": n, "ts": v["ts"], "n_rows": len(v["df"])}
+                         for n, v in S["versions"].items()]}
+
+
+@app.post("/api/version/restore")
+def restore_version(body: dict):
+    v = S.get("versions", {}).get(body.get("name"))
+    if v is None:
+        raise HTTPException(400, "unknown version")
+    S["cleaned"] = v["df"].copy()
+    _log_manual({"tool": "restore_version", "col": None,
+                 "rows_affected": len(S["cleaned"]),
+                 "reason": f"user restored version '{body['name']}'"})
+    _snapshot(f"restored version: {body['name']}", "revert")
+    return {"grid": _grid(S["cleaned"]), "n_rows": len(S["cleaned"]),
+            "undo_depth": len(S["timeline"]) - 1}
 
 
 @app.get("/api/report")
@@ -337,11 +406,19 @@ def report():
 
 
 @app.get("/api/download")
-def download():
-    if S.get("cleaned") is None or not S.get("rounds"):
-        raise HTTPException(400, "nothing executed yet")
-    out = Path(tempfile.gettempdir()) / (Path(S["name"]).stem + "_cleaned.csv")
-    S["cleaned"].to_csv(out, index=False)
+def download(version: str | None = None):
+    if S.get("cleaned") is None:
+        raise HTTPException(400, "upload a file first")
+    if version is not None:
+        v = S.get("versions", {}).get(version)
+        if v is None:
+            raise HTTPException(400, "unknown version")
+        df, tag = v["df"], f"_{version}"
+    else:
+        df, tag = S["cleaned"], "_cleaned"
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in tag)
+    out = Path(tempfile.gettempdir()) / (Path(S["name"]).stem + safe + ".csv")
+    df.to_csv(out, index=False)
     return FileResponse(out, filename=out.name, media_type="text/csv")
 
 
