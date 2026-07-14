@@ -177,6 +177,20 @@
   .notebox{color:var(--text-muted);font-size:.75rem;border-left:2px solid var(--accent);
         padding:.3rem .7rem;background:var(--accent-dim);border-radius:0 6px 6px 0}
 
+  /* ---------- context menu ---------- */
+  .ctx{position:fixed;z-index:120;min-width:15rem;background:var(--surface-2);
+       border:1px solid var(--border);border-radius:10px;padding:.35rem;
+       box-shadow:0 8px 30px rgba(0,0,0,.55);font-size:.8rem}
+  .ctx .head{font-family:var(--mono);font-size:.68rem;color:var(--accent-2);
+       padding:.35rem .7rem .25rem;letter-spacing:.05em}
+  .ctx .item{display:flex;align-items:center;gap:.55rem;width:100%;text-align:left;
+       border:none;background:transparent;border-radius:6px;padding:.42rem .7rem;
+       min-height:0;color:var(--text);cursor:pointer}
+  .ctx .item:hover{background:var(--accent-dim);color:var(--accent)}
+  .ctx .item .mono-tag{margin-left:auto;font-family:var(--mono);font-size:.65rem;
+       color:var(--text-muted)}
+  .ctx hr{border:none;border-top:1px solid var(--border);margin:.3rem .4rem}
+
   /* ---------- report modal ---------- */
   .modal{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);
         display:flex;align-items:center;justify-content:center;padding:2rem}
@@ -536,6 +550,85 @@ function renderVerdicts(){
       `<div class="verdict"><span>${esc(v.issue)}${!col&&v.col?` <span class="mono" style="color:var(--accent-2)">${esc(v.col)}</span>`:""}</span>
        <span class="v-${v.verdict} mono">${esc(v.verdict.replaceAll("_"," "))} ${esc(String(v.before))}&rarr;${esc(String(v.after))}</span></div>`).join("");
 }
+
+/* ---------- right-click context menu ---------- */
+const QUICK_TOOLS = [
+  {tool:"trim_whitespace",     label:"Trim whitespace",        params:{}},
+  {tool:"normalize_dates",     label:"Normalize dates to ISO", params:{}},
+  {tool:"normalize_phone",     label:"Normalize PH phones",    params:{}},
+  {tool:"normalize_currency",  label:"Parse currency values",  params:{}},
+  {tool:"standardize_categories",label:"Standardize categories",params:{}},
+  {tool:"fix_dtypes",          label:"Convert to numbers",     params:{target:"numeric"}},
+  {tool:"impute_missing",      label:"Flag missing values",    params:{strategy:"flag_only"}},
+  {tool:"flag_outliers",       label:"Flag outliers (IQR)",    params:{method:"iqr"}},
+];
+const TABLE_TOOLS = [
+  {tool:"drop_duplicates", label:"Drop duplicate rows",        params:{}},
+  {tool:"rename_columns",  label:"snake_case column names",    params:{}},
+];
+let ctxEl = null;
+function closeCtx(){ ctxEl?.remove(); ctxEl = null; }
+["click","scroll","resize"].forEach(ev=>window.addEventListener(ev, closeCtx, true));
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeCtx(); });
+
+function quickAction(col, spec){
+  state.selectedCol = col; renderGrid(); renderDrawer(!col); openDrawer();
+  state.suggestions = [{tool:spec.tool, col:col,
+    params:spec.params, reason:"quick action — you chose this from the right-click menu"}];
+  renderSuggestions("manual quick action");
+}
+
+function showCtx(x, y, col){
+  closeCtx();
+  ctxEl = document.createElement("div");
+  ctxEl.className = "ctx"; ctxEl.setAttribute("role","menu");
+  let html = `<div class="head">${col ? esc(col) : "whole table"}</div>`;
+  if(col){
+    html += `<button class="item" data-act="ask">Ask the AI about this column&hellip;</button>
+             <button class="item" data-act="suggest">Suggest fixes (AI)</button><hr>`;
+    QUICK_TOOLS.forEach((t,i)=>{
+      html += `<button class="item" data-quick="${i}">${t.label}
+               <span class="mono-tag">${t.tool}</span></button>`;
+    });
+    html += `<hr><button class="item" data-act="copy">Copy column name</button>`;
+  }else{
+    html += `<button class="item" data-act="cleanall">Clean everything (AI)&hellip;</button><hr>`;
+    TABLE_TOOLS.forEach((t,i)=>{
+      html += `<button class="item" data-table="${i}">${t.label}
+               <span class="mono-tag">${t.tool}</span></button>`;
+    });
+  }
+  ctxEl.innerHTML = html;
+  document.body.appendChild(ctxEl);
+  const r = ctxEl.getBoundingClientRect();
+  ctxEl.style.left = Math.min(x, innerWidth - r.width - 8) + "px";
+  ctxEl.style.top  = Math.min(y, innerHeight - r.height - 8) + "px";
+
+  ctxEl.querySelectorAll(".item").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const {act, quick, table} = btn.dataset;
+      closeCtx();
+      if(act==="ask"){ openColumn(col); setTimeout(()=>$("#instruction")?.focus(), 50); }
+      else if(act==="suggest"){ openColumn(col); suggest(col); }
+      else if(act==="cleanall"){ $("#btn-clean-all").click(); }
+      else if(act==="copy"){ navigator.clipboard?.writeText(col); toast("Copied: "+col); }
+      else if(quick!==undefined){ quickAction(col, QUICK_TOOLS[+quick]); }
+      else if(table!==undefined){ quickAction(null, TABLE_TOOLS[+table]); }
+    });
+  });
+}
+
+$("#gridwrap").addEventListener("contextmenu", e=>{
+  if(!state.grid) return;             // no file yet — keep native menu
+  const cell = e.target.closest("th[data-col], td");
+  if(!cell) return;
+  e.preventDefault();
+  let col = cell.dataset?.col;
+  if(!col && cell.tagName==="TD" && !cell.classList.contains("rownum")){
+    col = state.grid.columns[cell.cellIndex - 1];  // -1: row-number column
+  }
+  showCtx(e.clientX, e.clientY, col || null);
+});
 
 /* ---------- report / new ---------- */
 $("#btn-report").addEventListener("click", async ()=>{
