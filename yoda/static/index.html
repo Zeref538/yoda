@@ -65,7 +65,14 @@
   .filechip{font-family:var(--mono);font-size:.78rem;color:var(--text-muted);
          border:1px dashed var(--border);border-radius:8px;padding:.25rem .6rem}
   .grow{flex:1}
-  header .model{width:9.5rem;min-height:40px;font-family:var(--mono);font-size:.8rem}
+  header select.model{appearance:none;-webkit-appearance:none;width:11rem;
+     min-height:40px;font-family:var(--mono);font-size:.8rem;cursor:pointer;
+     background-color:var(--surface-2);color:var(--accent-2);
+     border:1px solid var(--border);border-radius:8px;padding:.45rem 2rem .45rem .7rem;
+     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b98a9' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+     background-repeat:no-repeat;background-position:right .6rem center}
+  header select.model:hover{border-color:var(--accent)}
+  header select.model option{background:var(--surface);color:var(--text)}
 
   /* ---------- layout ---------- */
   .stage{flex:1;display:flex;min-height:0}
@@ -117,11 +124,17 @@
   .sw.new{background:var(--accent-2-dim);border:1px solid var(--accent-2)}
   .sw.warn{background:var(--warn-dim);border:1px solid var(--warn)}
 
-  /* ---------- drawer ---------- */
-  aside{width:24rem;max-width:90vw;background:var(--surface);
-        border-left:1px solid var(--border);display:flex;flex-direction:column;
-        transform:translateX(100%);transition:transform .25s ease-out;position:relative;z-index:25}
-  aside.open{transform:none}
+  /* ---------- left sidebar (collapsible) ---------- */
+  aside{width:0;overflow:hidden;background:var(--surface);
+        border-right:1px solid var(--border);display:flex;flex-direction:column;
+        transition:width .22s ease-out;position:relative;z-index:25;flex-shrink:0}
+  aside.open{width:23.5rem;max-width:85vw}
+  .rail{width:1.4rem;flex-shrink:0;background:var(--surface);
+        border-right:1px solid var(--border);display:flex;align-items:center;
+        justify-content:center}
+  .rail button{min-height:64px;width:100%;padding:0;border:none;border-radius:0;
+        background:transparent;color:var(--text-muted);font-size:.8rem}
+  .rail button:hover{color:var(--accent);background:var(--accent-dim)}
   .drawer-head{display:flex;align-items:center;gap:.6rem;padding:.9rem 1rem;
         border-bottom:1px solid var(--border)}
   .drawer-head h2{font-size:.95rem;font-family:var(--mono);color:var(--accent)}
@@ -134,12 +147,17 @@
         padding:.3rem .5rem;background:var(--surface-2);border-radius:6px;
         border:1px solid var(--border)}
   .issue-line .n{font-family:var(--mono);color:var(--warn)}
-  .suggestion{border:1px solid var(--border);border-radius:10px;padding:.7rem;
-        background:var(--surface-2);display:flex;gap:.6rem;align-items:flex-start;
-        transition:opacity .2s}
-  .suggestion.off{opacity:.4}
-  .suggestion input[type=checkbox]{width:1.2rem;height:1.2rem;margin-top:.15rem;
-        accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+  .suggestion{border:1px solid var(--border);border-radius:10px;padding:.7rem .8rem;
+        background:var(--surface-2);display:flex;gap:.7rem;align-items:flex-start;
+        justify-content:space-between;cursor:pointer;
+        transition:border-color .18s,background .18s}
+  .suggestion:hover{border-color:var(--accent)}
+  .suggestion.on{border-color:var(--accent);background:var(--accent-dim)}
+  .suggestion .tick{flex-shrink:0;width:1.3rem;height:1.3rem;border-radius:50%;
+        border:1.5px solid var(--border);display:flex;align-items:center;
+        justify-content:center;color:transparent;font-size:.75rem;margin-top:.1rem;
+        transition:border-color .18s,background .18s,color .18s}
+  .suggestion.on .tick{background:var(--accent);border-color:var(--accent);color:#fff}
   .suggestion .tool{font-family:var(--mono);font-weight:600;color:var(--accent)}
   .suggestion .on-col{font-family:var(--mono);color:var(--accent-2);font-size:.78rem}
   .suggestion .why{color:var(--text-muted);font-size:.78rem;margin-top:.15rem}
@@ -187,8 +205,9 @@
   <span class="badge"><span class="pulse"></span>100% LOCAL</span>
   <span class="filechip hidden" id="filechip"></span>
   <div class="grow"></div>
-  <input type="text" class="model mono" id="model" value="qwen3.5:4b"
-         aria-label="Ollama model" title="Ollama model">
+  <select class="model" id="model" aria-label="Ollama model" title="Ollama model">
+    <option value="qwen3.5:4b">qwen3.5:4b</option>
+  </select>
   <button id="btn-clean-all" class="primary hidden">Clean everything</button>
   <button id="btn-report" class="ghost hidden">Report</button>
   <a id="dl" href="/api/download" download class="hidden"><button class="ghost">Download CSV</button></a>
@@ -196,6 +215,22 @@
 </header>
 
 <div class="stage">
+  <!-- left sidebar -->
+  <aside id="drawer" aria-label="AI assistant panel">
+    <div class="drawer-head">
+      <h2 id="drawer-title">assistant</h2>
+      <div class="grow"></div>
+    </div>
+    <div class="drawer-body" id="drawer-body">
+      <div class="notebox">Load a file, then click a column header — or use
+        <strong>Clean everything</strong> — to get AI suggestions here.</div>
+    </div>
+  </aside>
+  <div class="rail">
+    <button id="drawer-toggle" aria-label="Open or close the assistant panel"
+            aria-expanded="false" title="Open/close panel">&rsaquo;</button>
+  </div>
+
   <div class="gridwrap" id="gridwrap">
     <!-- empty state -->
     <div class="empty" id="empty">
@@ -218,17 +253,6 @@
     <!-- data grid -->
     <table class="grid hidden" id="grid" aria-label="Data grid"></table>
   </div>
-
-  <!-- drawer -->
-  <aside id="drawer" aria-label="AI assistant panel">
-    <div class="drawer-head">
-      <h2 id="drawer-title">column</h2>
-      <div class="grow"></div>
-      <button class="ghost" id="drawer-close" aria-label="Close panel"
-              style="min-height:32px;padding:.2rem .6rem">&#10005;</button>
-    </div>
-    <div class="drawer-body" id="drawer-body"></div>
-  </aside>
 </div>
 
 <div class="statusbar" id="statusbar">
@@ -327,11 +351,29 @@ function renderGrid(){
   });
 }
 
-/* ---------- drawer ---------- */
-function openDrawer(){ $("#drawer").classList.add("open"); }
-function closeDrawer(){ $("#drawer").classList.remove("open");
-  state.selectedCol = null; if(state.grid) renderGrid(); }
-$("#drawer-close").addEventListener("click", closeDrawer);
+/* ---------- sidebar open/close ---------- */
+function setDrawer(open){
+  $("#drawer").classList.toggle("open", open);
+  const btn = $("#drawer-toggle");
+  btn.innerHTML = open ? "&lsaquo;" : "&rsaquo;";
+  btn.setAttribute("aria-expanded", String(open));
+}
+function openDrawer(){ setDrawer(true); }
+function closeDrawer(){ setDrawer(false); }
+$("#drawer-toggle").addEventListener("click",
+  ()=>setDrawer(!$("#drawer").classList.contains("open")));
+
+/* ---------- installed models dropdown ---------- */
+(async ()=>{
+  try{
+    const d = await (await fetch("/api/models")).json();
+    if(d.models.length){
+      const sel = $("#model");
+      sel.innerHTML = d.models.map(m=>
+        `<option value="${esc(m)}"${m==="qwen3.5:4b"?" selected":""}>${esc(m)}</option>`).join("");
+    }
+  }catch(e){ /* keep default option */ }
+})();
 
 function openColumn(col){
   state.selectedCol = col; state.suggestions = [];
@@ -416,22 +458,30 @@ function renderSuggestions(src){
   state.suggestions.forEach((s,i)=>{
     const params = Object.keys(s.params||{}).length ? JSON.stringify(s.params) : "";
     html += `
-      <div class="suggestion" data-i="${i}">
-        <input type="checkbox" checked aria-label="Approve: ${esc(s.tool)} on ${esc(s.col??'whole table')}">
+      <div class="suggestion on" data-i="${i}" tabindex="0" role="checkbox"
+           aria-checked="true" aria-label="Approve: ${esc(s.tool)} on ${esc(s.col??'whole table')}">
         <div>
           <div><span class="tool">${esc(s.tool)}</span>
                <span class="on-col">(${esc(s.col??"whole table")})</span></div>
           ${params?`<div class="mono" style="font-size:.72rem;color:var(--warn)">${esc(params)}</div>`:""}
           <div class="why">${esc(s.reason||"")}</div>
         </div>
+        <span class="tick" aria-hidden="true">&#10003;</span>
       </div>`;
   });
   html += `<button class="primary" id="btn-approve">Approve &amp; apply</button>
-           <div class="notebox">Only ticked steps run. Changed cells turn
+           <div class="notebox">Only selected cards run. Changed cells turn
            <span style="color:var(--ok)">green</span> in the grid.</div>`;
   box.innerHTML = html;
-  box.querySelectorAll(".suggestion input").forEach(cb=>{
-    cb.addEventListener("change",()=>cb.closest(".suggestion").classList.toggle("off",!cb.checked));
+  box.querySelectorAll(".suggestion").forEach(card=>{
+    const flip = ()=>{
+      card.classList.toggle("on");
+      card.setAttribute("aria-checked", card.classList.contains("on"));
+    };
+    card.addEventListener("click", flip);
+    card.addEventListener("keydown", e=>{
+      if(e.key===" "||e.key==="Enter"){ e.preventDefault(); flip(); }
+    });
   });
   $("#btn-approve").addEventListener("click", applyApproved);
 }
@@ -439,8 +489,7 @@ function renderSuggestions(src){
 /* ---------- execute ---------- */
 async function applyApproved(){
   if(state.busy) return;
-  const steps = [...document.querySelectorAll("#sugg-box .suggestion")]
-    .filter(el=>el.querySelector("input").checked)
+  const steps = [...document.querySelectorAll("#sugg-box .suggestion.on")]
     .map(el=>state.suggestions[+el.dataset.i]);
   if(!steps.length){ toast("No steps ticked."); return; }
   state.busy = true;

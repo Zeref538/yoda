@@ -113,6 +113,18 @@ def index():
     return (STATIC / "index.html").read_text(encoding="utf-8")
 
 
+@app.get("/api/models")
+def models():
+    """Installed Ollama models for the model dropdown (empty list if down)."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3) as r:
+            tags = json.loads(r.read())
+        return {"models": [m["name"] for m in tags.get("models", [])]}
+    except OSError:
+        return {"models": []}
+
+
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):
     suffix = Path(file.filename or "data.csv").suffix.lower()
