@@ -8,13 +8,28 @@ from pathlib import Path
 import pandas as pd
 
 
+def dedupe_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Make column names unique (a, a_2, a_3...). Duplicate names crash the
+    profiler and make plans ambiguous; Excel/SQLite sources can produce them."""
+    if not df.columns.duplicated().any():
+        return df
+    seen: dict[str, int] = {}
+    new_cols = []
+    for c in map(str, df.columns):
+        seen[c] = seen.get(c, 0) + 1
+        new_cols.append(c if seen[c] == 1 else f"{c}_{seen[c]}")
+    out = df.copy()
+    out.columns = new_cols
+    return out
+
+
 def load(path: str | Path, table: str | None = None) -> pd.DataFrame:
     p = Path(path)
     suffix = p.suffix.lower()
     if suffix == ".csv":
-        return pd.read_csv(p)
+        return dedupe_columns(pd.read_csv(p))
     if suffix in (".xlsx", ".xls"):
-        return pd.read_excel(p)
+        return dedupe_columns(pd.read_excel(p))
     if suffix in (".sqlite", ".db", ".sqlite3"):
         with sqlite3.connect(p) as conn:
             if table is None:
@@ -24,7 +39,7 @@ def load(path: str | Path, table: str | None = None) -> pd.DataFrame:
                     raise ValueError(
                         f"database has tables {tables}; pick one with --table")
                 table = tables[0]
-            return pd.read_sql_query(f'SELECT * FROM "{table}"', conn)
+            return dedupe_columns(pd.read_sql_query(f'SELECT * FROM "{table}"', conn))
     raise ValueError(f"unsupported file type: {suffix}")
 
 

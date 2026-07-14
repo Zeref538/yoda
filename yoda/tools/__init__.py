@@ -36,27 +36,26 @@ def normalize_dates(df: pd.DataFrame, col: str, params: dict | None = None):
     params = params or {}
     dayfirst = bool(params.get("dayfirst", False))
     out = df.copy()
-    n_changed = n_failed = 0
 
-    def conv(v):
-        nonlocal n_changed, n_failed
-        if pd.isna(v):
-            return v
+    # Parse each distinct value once (date columns repeat heavily), then map.
+    mapping: dict = {}
+    failed: set = set()
+    for v in out[col].dropna().unique():
         s = str(v).strip()
         try:
             if re.fullmatch(r"\d{8}", s):
                 d = pd.Timestamp(s[:4] + "-" + s[4:6] + "-" + s[6:])
             else:
                 d = dateparser.parse(s, dayfirst=dayfirst)
-            iso = d.strftime("%Y-%m-%d")
-            if iso != s:
-                n_changed += 1
-            return iso
+            mapping[v] = d.strftime("%Y-%m-%d")
         except (ValueError, OverflowError):
-            n_failed += 1
-            return v
+            mapping[v] = v
+            failed.add(v)
 
-    out[col] = out[col].map(conv)
+    old = out[col]
+    out[col] = old.map(lambda v: v if pd.isna(v) else mapping[v])
+    n_changed = int(((out[col].astype(str) != old.astype(str)) & old.notna()).sum())
+    n_failed = int(old.isin(failed).sum())
     return out, {"rows_affected": n_changed, "parse_failures": n_failed}
 
 

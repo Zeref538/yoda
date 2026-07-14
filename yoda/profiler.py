@@ -45,12 +45,17 @@ def _safe(x: object) -> object:
     return x
 
 
-def _detect_patterns(values: pd.Series, patterns: dict[str, re.Pattern]) -> dict[str, int]:
+_DETECT_SAMPLE = 50_000
+
+
+def _detect_patterns(values: pd.Series, patterns: dict[str, re.Pattern],
+                     scale: float = 1.0) -> dict[str, int]:
+    """`values` must already be str dtype; counts are scaled when sampled."""
     found: dict[str, int] = {}
     for name, rx in patterns.items():
-        n = int(values.astype(str).str.match(rx).sum())
+        n = int(values.str.match(rx).sum())
         if n:
-            found[name] = n
+            found[name] = max(1, round(n * scale))
     return found
 
 
@@ -80,23 +85,31 @@ def _column_profile(name: str, s: pd.Series, n_rows: int) -> dict:
                 info["iqr_outliers"] = n_out
     elif len(non_null):
         as_str = non_null.astype(str)
+        # Pattern detection runs on a deterministic sample for very large
+        # columns (counts are scaled); exact stats (nulls, uniques, dups)
+        # are always computed on the full data.
+        if len(as_str) > _DETECT_SAMPLE:
+            det = as_str.sample(_DETECT_SAMPLE, random_state=0)
+            scale = len(as_str) / _DETECT_SAMPLE
+        else:
+            det, scale = as_str, 1.0
 
-        dates = _detect_patterns(as_str, _DATE_PATTERNS)
+        dates = _detect_patterns(det, _DATE_PATTERNS, scale)
         if dates:
             info["date_formats_seen"] = dates
-        phones = _detect_patterns(as_str, _PHONE_PATTERNS)
+        phones = _detect_patterns(det, _PHONE_PATTERNS, scale)
         if phones:
             info["phone_formats_seen"] = phones
 
-        n_currency = int(as_str.str.match(_CURRENCY_RE).sum())
+        n_currency = int(det.str.match(_CURRENCY_RE).sum())
         if n_currency:
-            info["currency_like_values"] = n_currency
-        n_numeric_str = int(as_str.str.match(_NUMERIC_STR_RE).sum())
+            info["currency_like_values"] = max(1, round(n_currency * scale))
+        n_numeric_str = int(det.str.match(_NUMERIC_STR_RE).sum())
         if n_numeric_str and not dates:
-            info["numeric_as_string"] = n_numeric_str
-        n_bool_str = int(as_str.str.lower().str.strip().isin(_BOOL_STRINGS).sum())
-        if n_bool_str == len(non_null):
-            info["bool_as_string"] = n_bool_str
+            info["numeric_as_string"] = max(1, round(n_numeric_str * scale))
+        n_bool_str = int(det.str.lower().str.strip().isin(_BOOL_STRINGS).sum())
+        if n_bool_str == len(det):
+            info["bool_as_string"] = len(non_null)
 
         # Numeric-like object columns (e.g. numbers polluted with strings/
         # nulls) still deserve outlier stats — coerce and check.
@@ -111,11 +124,11 @@ def _column_profile(name: str, s: pd.Series, n_rows: int) -> dict:
                 if n_out:
                     info["iqr_outliers"] = n_out
 
-        # Whitespace / unicode issues
-        n_ws = int((as_str != as_str.str.strip()).sum())
-        n_ws += int(as_str.str.contains(r"\s{2,}", regex=True).sum())
+        # Whitespace / unicode issues (sampled + scaled like patterns)
+        n_ws = int((det != det.str.strip()).sum())
+        n_ws += int(det.str.contains(r"\s{2,}", regex=True).sum())
         if n_ws:
-            info["whitespace_issues"] = n_ws
+            info["whitespace_issues"] = max(1, round(n_ws * scale))
         n_nfc = sum(1 for v in as_str.head(500) if unicodedata.normalize("NFC", v) != v)
         if n_nfc:
             info["non_nfc_values"] = n_nfc

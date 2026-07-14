@@ -18,7 +18,7 @@ def render_plan(plan: list[dict], console: Console, title: str = "Proposed clean
     t.add_column("params")
     t.add_column("reason", max_width=50)
     for i, s in enumerate(plan):
-        t.add_row(str(i + 1), s["tool"], str(s.get("col") or "—"),
+        t.add_row(str(i + 1), s["tool"], str(s.get("col") or "-"),
                   json.dumps(s.get("params") or {}), s.get("reason", ""))
     console.print(t)
 
@@ -31,8 +31,8 @@ def approve_plan(plan: list[dict], console: Console, auto_yes: bool = False) -> 
         return plan
 
     approved: list[dict] = []
-    console.print("\nFor each step: [green]y[/green] approve · [red]n[/red] skip · "
-                  "[yellow]e[/yellow] edit params (JSON) · [cyan]a[/cyan] approve all rest\n")
+    console.print("\nFor each step: [green]y[/green] approve | [red]n[/red] skip | "
+                  "[yellow]e[/yellow] edit params (JSON) | [cyan]a[/cyan] approve all rest\n")
     approve_rest = False
     for i, step in enumerate(plan):
         if approve_rest:
@@ -52,7 +52,7 @@ def approve_plan(plan: list[dict], console: Console, auto_yes: bool = False) -> 
                 step = {**step, "params": json.loads(raw)}
                 approved.append(step)
             except json.JSONDecodeError:
-                console.print("[red]invalid JSON — step skipped[/red]")
+                console.print("[red]invalid JSON - step skipped[/red]")
         else:
             console.print(f"[dim]skipped step {i + 1}[/dim]")
     return approved

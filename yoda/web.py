@@ -136,11 +136,12 @@ def models():
 async def upload(file: UploadFile = File(...)):
     suffix = Path(file.filename or "data.csv").suffix.lower()
     raw = await file.read()
+    from yoda.io import dedupe_columns
     try:
         if suffix == ".csv":
-            df = pd.read_csv(io.BytesIO(raw))
+            df = dedupe_columns(pd.read_csv(io.BytesIO(raw)))
         elif suffix in (".xlsx", ".xls"):
-            df = pd.read_excel(io.BytesIO(raw))
+            df = dedupe_columns(pd.read_excel(io.BytesIO(raw)))
         elif suffix in (".sqlite", ".db", ".sqlite3"):
             from yoda.io import load
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -230,8 +231,11 @@ def _snapshot(label: str, kind: str):
                "kind": kind, "ts": pd.Timestamp.now().isoformat(timespec="seconds"),
                "df": S["cleaned"].copy(), "rounds_len": len(S.get("rounds", [])),
                "n_rows": len(S["cleaned"])})
-    if len(tl) > 40:  # cap memory, keep the original
-        del tl[1:len(tl) - 39]
+    # Cap snapshot memory: generous history for small files, tighter for
+    # big ones (each snapshot is a full dataframe copy). Original is kept.
+    cap = 40 if len(S["cleaned"]) <= 50_000 else 10
+    if len(tl) > cap:
+        del tl[1:len(tl) - cap + 1]
 
 
 def _timeline_meta():

@@ -13,13 +13,13 @@ from rich.table import Table
 
 from yoda import __version__
 
-# Windows consoles often default to cp1252, which can't encode ₱ / → found
+# Windows consoles often default to cp1252, which can't encode ₱ / -> found
 # in profiles and reports. Degrade gracefully instead of crashing.
 for stream in (sys.stdout, sys.stderr):
     if hasattr(stream, "reconfigure"):
         stream.reconfigure(errors="replace")
 
-app = typer.Typer(help="YODA — Your Offline Data Agent. Cleans tabular data 100% locally.")
+app = typer.Typer(help="YODA - Your Offline Data Agent. Cleans tabular data 100% locally.")
 console = Console()
 
 _STATUS_STYLE = {"ok": "green", "skipped": "yellow", "error": "red"}
@@ -34,13 +34,13 @@ _VERDICT_STYLE = {
 
 def _banner(subtitle: str) -> None:
     console.print(Panel.fit(
-        f"[bold cyan]YODA[/bold cyan] — Your Offline Data Agent  [dim]v{__version__}[/dim]\n"
+        f"[bold cyan]YODA[/bold cyan] - Your Offline Data Agent  [dim]v{__version__}[/dim]\n"
         f"[dim]{subtitle}[/dim]",
         border_style="cyan"))
 
 
 def _issue_summary(prof: dict) -> Table | None:
-    """One row per detected issue signal — what the planner will act on."""
+    """One row per detected issue signal - what the planner will act on."""
     rows = []
     dup = prof["duplicates"]["full_row"]
     if dup:
@@ -112,7 +112,7 @@ def _verification_table(verdicts: list[dict]) -> Table:
 @app.command()
 def version() -> None:
     """Print the YODA version."""
-    console.print(f"YODA — Your Offline Data Agent v{__version__}")
+    console.print(f"YODA - Your Offline Data Agent v{__version__}")
 
 
 @app.command()
@@ -126,7 +126,7 @@ def clean(
     recipe: str = typer.Option(None, help="Replay a saved recipe instead of planning"),
     save_recipe: str = typer.Option(None, help="Save the approved plan as a recipe JSON"),
 ) -> None:
-    """Profile → plan (local LLM) → human approval → execute → verify → report."""
+    """Profile -> plan (local LLM) -> human approval -> execute -> verify -> report."""
     # Imports here keep `yoda version` fast and dependency-light.
     from yoda.executor import execute
     from yoda.gate import approve_plan, render_plan
@@ -150,7 +150,7 @@ def clean(
         prof = profile(df)
     summary = _issue_summary(prof)
     if summary is None:
-        console.print("[green]Profiler found no issues — nothing to clean.[/green]")
+        console.print("[green]Profiler found no issues - nothing to clean.[/green]")
         raise typer.Exit()
     console.print(summary)
     console.print()
@@ -172,7 +172,7 @@ def clean(
             plan = planner_obj.plan(prof)
         src = planner_obj.last_outcome.get("source")
         if src == "fallback_rule_based":
-            console.print("[yellow]LLM plan invalid or Ollama unavailable after retries — "
+            console.print("[yellow]LLM plan invalid or Ollama unavailable after retries - "
                           "fell back to the deterministic rule-based plan.[/yellow]")
             for e in planner_obj.last_outcome.get("errors", []):
                 console.print(f"[dim]  {e}[/dim]")
@@ -184,23 +184,23 @@ def clean(
                           "validated against the JSON schema.[/dim]\n")
 
     if not plan:
-        console.print("[green]Planner proposed no steps — nothing to clean.[/green]")
+        console.print("[green]Planner proposed no steps - nothing to clean.[/green]")
         raise typer.Exit()
 
     if dry_run:
-        render_plan(plan, console, title="Cleaning plan (dry run — nothing was executed)")
+        render_plan(plan, console, title="Cleaning plan (dry run - nothing was executed)")
         console.print("[dim]Re-run without --dry-run to apply.[/dim]")
         raise typer.Exit()
 
-    console.print("[cyan]Step 3/5[/cyan] Your approval — nothing runs without it:")
+    console.print("[cyan]Step 3/5[/cyan] Your approval - nothing runs without it:")
     approved = approve_plan(plan, console, auto_yes=yes or bool(recipe))
     if not approved:
-        console.print("[yellow]No steps approved — exiting without touching anything.[/yellow]")
+        console.print("[yellow]No steps approved - exiting without touching anything.[/yellow]")
         raise typer.Exit()
     if save_recipe:
         from yoda.recipe import save_recipe as _save
         _save(approved, save_recipe, source=path)
-        console.print(f"[dim]Recipe saved to [bold]{save_recipe}[/bold] — replay with "
+        console.print(f"[dim]Recipe saved to [bold]{save_recipe}[/bold] - replay with "
                       f"`yoda clean other.csv --recipe {save_recipe}`.[/dim]")
 
     src_path = Path(path)
@@ -216,7 +216,7 @@ def clean(
         verdicts = diff_profiles(prof, new_prof)
     followup = follow_up_plan(verdicts, planner_obj, new_prof)
     if followup:
-        console.print(f"\n[yellow]Verifier: {len(followup)} issue(s) survived round 1 — "
+        console.print(f"\n[yellow]Verifier: {len(followup)} issue(s) survived round 1 - "
                       "proposing a follow-up round.[/yellow]")
         approved2 = approve_plan(followup, console, auto_yes=yes)
         if approved2:
@@ -240,9 +240,9 @@ def clean(
     n_changed = sum(e.get("rows_affected", 0) for r in rounds for e in r["audit"])
     verdict_line = ("[green]all detected issues resolved or flagged[/green]"
                     if n_open == 0 else
-                    f"[yellow]{n_open} issue(s) still open — see report[/yellow]")
+                    f"[yellow]{n_open} issue(s) still open - see report[/yellow]")
     console.print(Panel.fit(
-        f"[bold green]Done[/bold green] in {len(rounds)} round(s) — "
+        f"[bold green]Done[/bold green] in {len(rounds)} round(s) - "
         f"{len(df)} -> {len(cleaned)} rows, {n_changed} cell/row changes\n"
         f"Verifier: {verdict_line}\n\n"
         f"Cleaned data  [bold]{out_path}[/bold]\n"
@@ -281,7 +281,7 @@ def watch(
             console.print(f"  [green]cleaned[/green] {r['file']} "
                           f"({r['rows']} rows) -> {r['out']}")
         else:
-            console.print(f"  [yellow]quarantined[/yellow] {r['file']} — {r['reason']}")
+            console.print(f"  [yellow]quarantined[/yellow] {r['file']} - {r['reason']}")
 
     try:
         run_watch(folder, steps, out_dir, q_dir, interval=interval,
@@ -295,7 +295,7 @@ def web(
     port: int = typer.Option(8000, help="Port on 127.0.0.1"),
     no_browser: bool = typer.Option(False, "--no-browser", help="Don't auto-open a browser"),
 ) -> None:
-    """Launch the local web UI (binds to 127.0.0.1 only — never exposed)."""
+    """Launch the local web UI (binds to 127.0.0.1 only - never exposed)."""
     try:
         from yoda.web import serve
     except ImportError:
