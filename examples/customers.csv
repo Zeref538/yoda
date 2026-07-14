@@ -1,0 +1,131 @@
+customer_id,full_name,email,phone,city,signup_date,monthly_spend,segment
+5118,Darren Nguyen,,0920 412 6347,makati,2025-06-02,7532.81,rETAIL
+5018,Jason Moore,kristaherman@example.com,+639073702838,Manila,2025-09-09,2092.61,Retail
+5085,Christy Moore,dgriffith@example.com,+639271051298,Manila,2026-07-13,9908.64,SME
+5081,Susan Bernard,jeffrey58@example.org,+639041214304,Makati,2025-07-06,7826.95,SME
+5063,Tiffany Contreras,rogerwong@example.org,+639043858176,Manila,2025-03-26,10821.55,Retail
+5067,Randy Haas,markrobinson@example.com,+639311592123,Davao City,2024-05-29,2433.73,SME
+5052,Alyssa Edwards,frankeaton@example.net,+639495183801,Manila,2026-05-16,4093.8,Retail
+5010,Renee Morales,kellyadams@example.org,+639472671475,Quezon City,2024-03-02,2496.12,SME
+5045,Kimberly Wells,jacob62@example.com,63-932-568-8557,Davao City,2023-07-22,3901.45,Retail
+5115,Leslie Sanchez,kchristensen@example.net,+639163111196,Quezon City,2025-09-01,1815.74,Enterprise
+5041,Jennifer Mullen,sherylwheeler@example.org,+639025822018,Quezon City,2025-11-19,10134.57,Retail
+5046,Robin Conley,opope@example.org,+639735569632,Davao City,2023-11-21,PHP 8967.75,Enterprise
+5075,Janet Rodriguez,anthonyallen@example.com,+639927319796,Davao City,2025-09-10,6452.99,SME
+5078,Juan Petty,davidcabrera@example.net,+639182761166,Quezon City,2025-12-20,3082.93,Retail
+5107,Lauren Young,weaverjeremy@example.com,+639994398286,Cebu City,2025-07-03,601.83,Enterprise
+5086,Eric Rodgers,ndavis@example.net,0925 278 1206,qUEZON cITY,2024-05-12,11596.42,SME
+5016,Joshua Adams,eric59@example.net,+639517799229,Makati,2025-08-16,2642.43,enterprise
+5114,Melanie Knight,julie00@example.com,+639059871988,Makati,2024/04/11,841.45,Retail
+5071,Brandi Castillo,jon73@example.com,+639440190187,Makati,2024-09-11,1483.81,Enterprise
+5091,Erika Scott,,+639079113571,davao city,2025-10-14,"php 11,448.52",SME
+5057,Matthew Jackson,,+639188479188,Makati,2026-04-29,4036.15,SME
+5100,Kelly Ashley,,+639508111361,Davao City,2023-11-09,7297.57,Enterprise
+5006,Jessica Lang,hsanders@example.com,+639819672731,Davao City,2025-04-26,8156.78,Enterprise
+5004,	Joshua Roberts ,nancypadilla@example.net,+639169871689,Davao City,2024-11-05,4898.15,Enterprise
+5080,Bethany Jackson,pottererin@example.com,+639817805780,manila,2026-04-05,7875.11,SME
+5047,Joshua Baker,lutzandrew@example.org,+639264515474,Manila,2026-06-28,"php 6,632.38",SME
+5063,Tiffany Contreras,rogerwong@example.org,+639043858176,Manila,2025-03-26,10821.55,Retail
+5008,Meagan Love,eharrison@example.org,+639002978753,Cebu City,2024-01-19,8373.25,SME
+5050,Mary Lopez,kenneth45@example.org,63-962-048-4259,Makati,2025-03-08,5092.55,SME
+5092,Robin Phillips,lawrencechad@example.com,+639744796745,Manila,2025-12-06,1399.6,Enterprise
+5042,Sean Colon,matthew85@example.org,+639543829932,Quezon City,2026-04-30,11823.39,SME
+5082,Jennifer Mccullough,jenniferwilliams@example.org,+639418288983,Davao City,10/12/2023,9878.51,Enterprise
+5074,Katherine Guerrero,howard82@example.com,+639735736385,Davao City,2025-10-11,687.16,Retail
+5013,Rachel Robertson,lweeks@example.com,+639283792984,Quezon City,07/27/2025,5129.79,Retail
+5034,Shannon Edwards DDS   ,middletonleslie@example.org,+639500370382,Davao City,2026-01-21,8545.78,SME
+5102,Dennis  Mcbride,rhonda14@example.org,+639611387592,Quezon City,2023-09-08,1221.82,Retail
+5072,Monique Torres,briggsmichelle@example.net,+639979780252,Quezon City,2026-04-11,1440.81,RETAIL
+5044,Heather Tyler,matthew35@example.com,0935 795 1117,Cebu City,2025-06-26,3330.59,Enterprise
+5111,Kara Steele,gregory81@example.org,+639795965056,Cebu City,2023-07-16,9549.67,SME
+5021,Thomas Jimenez,zduncan@example.org,+639413301756,Makati,2024-03-09,9443.1,Enterprise
+5084,Ann Alvarado,marissajackson@example.org,+639792232838,Cebu City,2026-05-06,4917.99,Enterprise
+5023,Amanda Holland,,+639893949482,Quezon City,2025-06-14,9422.18,Retail
+5039,David Fisher,kimberlywhite@example.org,+639658440932,Cebu City,2026-05-06,"₱3,684.44",SME
+5053,Maria Smith,bryce43@example.net,+639739241968,Makati,2024-03-09,6798.06,Retail
+5087,Blake Espinoza,dariusharris@example.com,+639695851904,Manila,2024-05-03,1563.86,Retail
+5005,Michael Cox,ldavis@example.net,+639469788093,Manila,2025-08-26,9853.96,Enterprise
+5105,Karen Carter,deniseramirez@example.org,+639488361520,Manila,2024-10-01,7309.59,SME
+5059,Robert James,scottknight@example.net,+639307336882,Makati,2024-01-28,PHP 2693.08,SME
+5019,	Robert Meyer ,nicholasbenjamin@example.com,+639646861642,Cebu City,2023-11-05,2261.4,SME
+5090,Charles Walker,stephen99@example.org,+639984264079,Cebu City,2026-07-02,"php 11,391.13",SME
+5107,Lauren Young,weaverjeremy@example.com,+639994398286,Cebu City,2025-07-03,601.83,Enterprise
+5062,Joshua Murphy,rrogers@example.com,+639527220226,Makati,2026-06-01,5978.96,Enterprise
+5030,Kristine Santiago,craigbaker@example.com,+639291102859,Cebu City,2024-04-05,539.77,Enterprise
+5115,Leslie Sanchez,kchristensen@example.net,+639163111196,Quezon City,2025-09-01,1815.74,Enterprise
+5103,Ryan Pratt,,63-927-718-6210,Davao City,2025-01-16,5191.91,rETAIL
+5043,Lori Sanchez,cordovaerin@example.org,+639116494157,Davao City,2025-03-24,1627.08,Enterprise
+5094,Brandy Garcia,jacksonmichelle@example.org,+639586398488,Davao City,2023-09-23,8384.56,SME
+5000,Jonathan Hunt,hensonpatricia@example.net,+639158813998,Davao City,2025-11-24,9443.81,Enterprise
+5015,Jerry Payne,bishopjames@example.org,+639610550087,cEBU cITY,2026/03/04,8256.97,SME
+5117,Lee Fry,,+639829601796,Davao City,2026-01-11,5404.87,Enterprise
+5108,Andre Gutierrez,alexandercindy@example.org,+639487464397,mANILA,2024-07-15,"php 4,422.30",Enterprise
+5065,Karen Smith,,0983 166 3233,Davao City,"December 02, 2024",2710.02,rETAIL
+5104,Veronica Benson,kruegerrachel@example.org,+639770775106,Manila,2026-04-19,5252.17,RETAIL
+5088,Tracy Patterson,,+639499924800,Cebu City,2024-10-02,11058.88,Retail
+5061,Cynthia Compton,adamsautumn@example.net,+639222900442,Manila,2025-03-28,3357.19,eNTERPRISE
+5097,Emily Williams,caitlingonzales@example.org,+639463884985,Cebu City,2026-01-13,9064.61,Enterprise
+5066,	Daniel Bryant ,cindy51@example.net,+639866753478,Makati,2026-06-23,5885.32,RETAIL
+5054,Danielle Rodriguez,todd16@example.com,+639046028837,Cebu City,2026-02-26,"php 4,253.99",SME
+5119,Sandra King,uharrison@example.org,+639524013761,Cebu City,2023-12-18,4812.78,Retail
+5110,Albert Jones,tinabradley@example.net,+639156697961,Cebu City,07/25/2024,10458.63,SME
+5014,Mariah Berger,colin62@example.com,+639294866283,Davao City,2023-08-04,366.76,Retail
+5012,Mr. Ronald Morton,,+639190845205,Makati,2025-05-25,6976.55,SME
+5098,James Moreno,ydougherty@example.net,+639306866953,Makati,2023-09-04,7098.32,sme
+5011,Linda Ellis,mward@example.com,+639270107981,Makati,2026-06-23,PHP 9566.49,Retail
+5022,Christine Hanson,rgeorge@example.net,+639205258983,Quezon City,2023-10-29,7525.26,SME
+5058,Jennifer  Thompson,srobinson@example.com,+639552182488,dAVAO cITY,2025-01-07,7640.39,Enterprise
+5032,Amy Frederick,josebrown@example.com,09886423004,MAKATI,2024-08-16,5850.35,SME
+5106,Amanda  Middleton,blackwelljessica@example.org,+639461351619,Makati,2025-11-10,3317.7,SME
+5101,Joyce Morton,trujillorobert@example.org,+639816354011,Cebu City,2024-07-27,7974.76,SME
+5089,Jennifer Woods,wtanner@example.com,+639791372987,qUEZON cITY,2024-02-13,996.71,Retail
+5055,Bruce Wells,hmartinez@example.org,+639974754072,Quezon City,2025-01-21,5872.01,SME
+5031,Antonio Kelly,debbierodriguez@example.com,+639256663632,Manila,2024-09-15,6606.54,Enterprise
+5035,William Johns,michelle46@example.com,+639384535577,Makati,2025-01-17,9774.96,Enterprise
+5083,	Kevin Bush ,mark02@example.net,+639538671300,Davao City,2024-05-06,4752.88,Retail
+5049,Jordan Miller,qcook@example.com,+639565178836,Cebu City,2023-09-16,7849.06,Retail
+5024,Margaret Webb,andersonalyssa@example.net,+639621052185,Cebu City,2024-02-12,7139.68,Retail
+5009,Joyce Harrison,anita48@example.net,+639876804571,Davao City,2025-08-31,8334.13,Enterprise
+5037,	Steven Weaver ,james01@example.org,+639214584210,Makati,2026-03-01,2762.05,Enterprise
+5036,Mike Johns,heather41@example.com,+639943262705,Makati,2025-04-21,8487.71,Retail
+5003,Christine King,linda81@example.net,+639884472940,Cebu City,2024-12-23,PHP 4489.80,sme
+5099,Rachel Phillips,joseph69@example.org,+639013327967,Manila,2025-01-13,5338.28,Retail
+5064,Alexandra Hansen,david99@example.com,+639807001594,Cebu City,2025/07/22,9129.73,Retail
+5040,Kimberly Peters,kristin30@example.org,09526309765,Makati,2024/09/16,2216.45,Enterprise
+5061,Cynthia Compton,adamsautumn@example.net,+639222900442,Manila,2025-03-28,3357.19,eNTERPRISE
+5070,Gloria Reed,uscott@example.com,+639085417758,Makati,2023-09-09,9887.39,Retail
+5093,Robert Mcbride,iaustin@example.org,+639033463521,Manila,2024-03-07,4744.91,Enterprise
+5095,Andrea Guzman,oconnormelissa@example.com,09732840934,Manila,2024-03-08,10203.17,Enterprise
+5109,Curtis Avila,pramirez@example.net,+639444193039,Makati,2024-04-01,4184.1,SME
+5008,Meagan Love,eharrison@example.org,+639002978753,Cebu City,2024-01-19,8373.25,SME
+5079,Melvin Johnson,shelley22@example.com,+639428451420,Manila,2025/10/30,8538.41,Enterprise
+5047,Joshua Baker,lutzandrew@example.org,+639264515474,Manila,2026-06-28,"php 6,632.38",SME
+5073,Melanie Cannon,tina91@example.net,+639284001981,Cebu City,2025-10-02,PHP 8663.39,Sme
+5017,Teresa Gardner,mmatthews@example.net,+639579318603,Manila,2025-09-05,733.79,Enterprise
+5060,Gary Wilson,maureen74@example.org,+639728556898,mANILA,2025-11-06,1993.51,Enterprise
+5068,Carolyn Collins,rjoseph@example.net,+639082445607,Makati,2025-11-28,5630.41,SME
+5025,Ryan Price,fpatel@example.com,+639452441064,Davao City,2024-10-29,11592.11,Retail
+5038,Andrew Mills,anthony92@example.com,+639949066882,Makati,2025-04-19,1438.07,Retail
+5048,Laura Sosa,hryan@example.net,63-935-281-4497,Davao City,2026-05-07,4913.51,Enterprise
+5033,Alan Davis,,+639529128084,Cebu City,2025-12-25,7669.48,Enterprise
+5020,Gregory Gomez,johnsonthomas@example.net,+639764725877,Quezon City,2024-10-27,6421.57,Enterprise
+5112,	Ann Wolfe ,vlambert@example.net,+639056709048,Makati,2025-01-16,9560.05,Retail
+5113,Michael Smith,john63@example.com,+639564644033,quezon city,20260122,1119.29,Retail
+5007,Vickie Palmer,johnstonkatie@example.org,+639848648876,Davao City,2026-07-12,2589.87,SME
+5096,John Morris,zvaughn@example.org,+639927670940,Makati,2025-09-19,6263.3,Enterprise
+5027,Mr. Robert Hogan,abbottjesse@example.org,+639906593976,Quezon City,2025-06-18,8300.27,Enterprise
+5083,	Kevin Bush ,mark02@example.net,+639538671300,Davao City,2024-05-06,4752.88,Retail
+5054,Danielle Rodriguez,todd16@example.com,+639046028837,Cebu City,2026-02-26,"php 4,253.99",SME
+5002,Bobby Mitchell,colelisa@example.net,+639753645568,Quezon City,2025-08-13,8732.72,Retail
+5093,Robert Mcbride,iaustin@example.org,+639033463521,Manila,2024-03-07,4744.91,Enterprise
+5076,  Beth Lewis,kimberly72@example.net,+639360872438,Cebu City,06/01/2026,3354.23,SME
+5069,Allen Crosby,lopezjessica@example.org,+639572128357,davao city,2025-07-14,7380.79,Enterprise
+5051,Paul Smith,wcrosby@example.net,+639750031450,Manila,2024-04-04,PHP 9530.79,Enterprise
+5028,Jennifer Logan,susanbell@example.org,+639464506045,Cebu City,01/10/2025,8780.09,retail
+5116,Karen Jones,austinlarry@example.com,+639046587306,Cebu City,2024-08-08,1964.91,Enterprise
+5029,Laura Ryan,oliverjuan@example.net,+639465908538,Quezon City,2024-06-11,8715.8,Retail
+5034,Shannon Edwards DDS   ,middletonleslie@example.org,+639500370382,Davao City,2026-01-21,8545.78,SME
+5077,Erika Osborn,upatel@example.net,+639905982819,Cebu City,2024-05-02,9708.91,Enterprise
+5056,Joy Richards,,+639473548643,Makati,2024-11-09,839.41,SME
+5026,Christopher Marshall,lroberts@example.com,0913 041 1895,Cebu City,2025-09-27,9401.13,Enterprise
+5001,Kenneth  Kirby,lpotter@example.com,+639797309114,Quezon City,2024-07-20,5505.93,Enterprise

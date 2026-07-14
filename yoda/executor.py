@@ -31,12 +31,16 @@ def _examples(before: pd.DataFrame, after: pd.DataFrame, col: str | None, n: int
 
 
 def execute(
-    df: pd.DataFrame, plan: list[dict], audit_path: str | Path | None = None
+    df: pd.DataFrame,
+    plan: list[dict],
+    audit_path: str | Path | None = None,
+    on_step=None,
 ) -> tuple[pd.DataFrame, list[dict]]:
     """Run each plan step via the tools registry.
 
     Returns (cleaned_df, audit_entries). The input df is never mutated.
     Unknown tools or failing steps are logged and skipped, never fatal.
+    `on_step(entry)` is called after each step (for live CLI progress).
     """
     current = df.copy()
     audit: list[dict] = []
@@ -63,6 +67,8 @@ def execute(
             entry.update(status="error", error=f"{type(exc).__name__}: {exc}",
                          duration_ms=round((time.perf_counter() - t0) * 1000, 1))
         audit.append(entry)
+        if on_step:
+            on_step(entry)
 
     if audit_path:
         with open(audit_path, "w", encoding="utf-8") as f:
