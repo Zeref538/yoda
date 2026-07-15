@@ -2,7 +2,6 @@
 plus profiler blank signals, rule-based planner coverage, and the
 allow_impute_fill validation gate."""
 
-import numpy as np
 import pandas as pd
 import pytest
 
