@@ -103,6 +103,37 @@ def replace_values(df: pd.DataFrame, col: str, params: dict | None = None):
 
 
 @_tool
+def encode_categories(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Label-encode a column: map each distinct value to an integer code
+    (e.g. 1,2,3,4). Nulls stay null. The full value->code mapping is returned
+    in stats so the change is auditable and reversible.
+
+    params: start (int, default 1); order ("sorted" | "frequency" |
+    "appearance", default "sorted"); new_column (bool, default False —
+    replace in place; True adds a <col>_code column instead).
+    """
+    params = params or {}
+    start = int(params.get("start", 1))
+    order = params.get("order", "sorted")
+    new_column = bool(params.get("new_column", False))
+    out = df.copy()
+    s = out[col]
+    non_null = s.dropna()
+    if order == "frequency":
+        cats = list(non_null.value_counts().index)
+    elif order == "appearance":
+        cats = list(dict.fromkeys(non_null.tolist()))
+    else:  # sorted (deterministic, predictable to a human)
+        cats = sorted(non_null.unique(), key=lambda v: str(v))
+    mapping = {v: i for i, v in enumerate(cats, start=start)}
+    target = f"{col}_code" if new_column else col
+    out[target] = s.map(lambda v: v if pd.isna(v) else mapping[v])
+    return out, {"rows_affected": int(s.notna().sum()),
+                 "n_categories": len(mapping), "target": target,
+                 "mapping": {str(k): v for k, v in mapping.items()}}
+
+
+@_tool
 def normalize_dates(df: pd.DataFrame, col: str, params: dict | None = None):
     params = params or {}
     dayfirst = bool(params.get("dayfirst", False))

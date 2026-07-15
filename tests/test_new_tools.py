@@ -12,6 +12,7 @@ from yoda.tools import TOOLS
 drop_blank_rows = TOOLS["drop_blank_rows"]
 drop_blank_columns = TOOLS["drop_blank_columns"]
 replace_values = TOOLS["replace_values"]
+encode_categories = TOOLS["encode_categories"]
 
 
 def blanky_df():
@@ -74,6 +75,32 @@ def test_replace_values_regex_and_errors():
         replace_values(df, "c", {})              # missing find
     with pytest.raises(ValueError):
         replace_values(df, "c", {"find": "(", "regex": True})
+
+
+def test_encode_categories_sorted_in_place():
+    df = pd.DataFrame({"dept": ["Sales", "HR", "Sales", "IT", None]})
+    out, stats = encode_categories(df, "dept")
+    assert stats["mapping"] == {"HR": 1, "IT": 2, "Sales": 3}   # sorted, 1-based
+    assert list(out["dept"].dropna()) == [3, 1, 3, 2]
+    assert out["dept"].isna().sum() == 1                        # null preserved
+    assert stats["n_categories"] == 3
+
+
+def test_encode_categories_start_and_new_column():
+    df = pd.DataFrame({"g": ["b", "a", "b"]})
+    out, stats = encode_categories(df, "g", {"start": 0, "new_column": True})
+    assert stats["mapping"] == {"a": 0, "b": 1}
+    assert list(out["g"]) == ["b", "a", "b"]                    # original kept
+    assert list(out["g_code"]) == [1, 0, 1]
+    assert stats["target"] == "g_code"
+
+
+def test_encode_categories_orderings():
+    df = pd.DataFrame({"g": ["b", "b", "a", "c", "c", "c"]})
+    _, freq = encode_categories(df, "g", {"order": "frequency"})
+    assert freq["mapping"]["c"] == 1                            # most frequent -> 1
+    _, appear = encode_categories(df, "g", {"order": "appearance"})
+    assert appear["mapping"] == {"b": 1, "a": 2, "c": 3}        # order seen
 
 
 def test_profiler_blank_signals():

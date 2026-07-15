@@ -25,6 +25,7 @@ TOOL_NAMES = [
     "standardize_categories", "fix_dtypes", "impute_missing", "flag_outliers",
     "trim_whitespace", "validate_rule", "rename_columns",
     "drop_blank_rows", "drop_blank_columns", "replace_values",
+    "encode_categories",
 ]
 
 PLAN_SCHEMA = {
@@ -80,19 +81,39 @@ Available tools (col = column to act on, null for whole-table tools):
 - replace_values(col, params={"find": ..., "replace": ..., "regex": bool}) —
   find/replace inside one column. Use ONLY when the user explicitly asks for a
   replacement; never invent one.
+- encode_categories(col, params={"start": 1}) — label-encode: map each distinct
+  value to an integer (1,2,3,4...). Use when the user asks to turn categories
+  into numbers / number them by category / assign codes per unique value.
 
 Rules: propose a step ONLY when the profile shows evidence for it. Do not invent
 columns. Do not clean what is not dirty — unnecessary changes are penalized.
 Each step needs a short "reason" citing the profile evidence.
-EXCEPTION: when the user gives an explicit instruction, satisfy it with the
-matching tool(s) even if the profile shows no signal for it — the human is the
-authority. Plain-language mapping: "remove/delete blank|empty rows" ->
-drop_blank_rows; "remove empty columns" -> drop_blank_columns; "delete column X"
--> drop_blank_columns(col=X); "replace A with B in X" -> replace_values(col=X,
-params={"find":"A","replace":"B"}); "remove duplicates" -> drop_duplicates;
-"fix/standardize the dates" -> normalize_dates; "fill missing with the average"
--> impute_missing(params={"strategy":"mean"}) (an explicit user ask is the ONE
-case where a strategy other than flag_only is allowed).
+
+EXCEPTION — user instructions win. When the user gives an explicit instruction,
+your job is to DO WHAT THEY ASK: satisfy it with the matching tool(s) even if the
+profile shows no signal for it, and even if nothing looks "dirty". The human is
+the authority. Read the instruction for INTENT, not exact keywords — different
+wordings of the same request map to the same tool. If an instruction names a
+column, act on that column; if it does not, pick the column its description best
+fits from the profile. If truly nothing matches, return an empty plan rather than
+inventing unrelated steps.
+
+Plain-language mapping (match on meaning, these are examples not the only phrasings):
+- "remove/delete/drop blank|empty rows", "get rid of empty lines" -> drop_blank_rows
+- "remove empty/blank columns" -> drop_blank_columns
+- "delete/drop/remove column X", "I don't need X" -> drop_blank_columns(col=X)
+- "replace A with B in X", "change A to B", "swap A for B" -> replace_values(col=X,
+  params={"find":"A","replace":"B"})
+- "change these to 1,2,3,4", "number them by category", "turn X into numbers",
+  "give each value a code", "encode/label-encode X depending on the unique value"
+  -> encode_categories(col=X)
+- "remove/drop duplicates", "dedupe" -> drop_duplicates
+- "fix/standardize/clean up the dates", "make dates consistent" -> normalize_dates
+- "standardize/unify the categories", "make the casing consistent" -> standardize_categories
+- "fill missing with the average/mean|median|mode", "fill the blanks with X"
+  -> impute_missing(params={"strategy":"mean|median|mode|constant"}) — an explicit
+  user ask is the ONE case where a strategy other than flag_only is allowed.
+- "trim/strip the spaces", "clean up whitespace" -> trim_whitespace
 
 Tool-choice examples (learn the signal -> tool mapping exactly):
 1. Profile shows: "price": {"currency_like_values": 25, "numeric_as_string": 180}
@@ -111,7 +132,12 @@ Tool-choice examples (learn the signal -> tool mapping exactly):
 4. Profile shows: "age": {"iqr_outliers": 12, "null_pct": 4.0}
    -> TWO steps: flag_outliers(age, {"method": "iqr"}) AND
       impute_missing(age, {"strategy": "flag_only"}) — outliers and nulls
-      are separate issues; both are flagged, never deleted or filled."""
+      are separate issues; both are flagged, never deleted or filled.
+5. User asks: "change the department column to 1,2,3,4 depending on the value"
+   -> {"tool": "encode_categories", "col": "department", "params": {},
+       "reason": "user asked to label-encode categories as integers"}
+   This is an explicit instruction — do it even though no profile signal
+   demands it."""
 
 
 class RuleBasedPlanner:
