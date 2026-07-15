@@ -43,6 +43,7 @@ _SIGNAL_TOOL = {
     "casing_variants": "standardize_categories",
     "nulls": "impute_missing",
     "outliers": "flag_outliers",
+    "blank_rows": "drop_blank_rows",
 }
 
 OPEN_VERDICTS = ("unresolved", "partially_resolved", "new_issue")
@@ -61,6 +62,16 @@ def diff_profiles(before: dict, after: dict) -> list[dict]:
             "verdict": ("resolved" if dup_a == 0 else
                         "new_issue" if dup_b == 0 else
                         "partially_resolved" if dup_a < dup_b else "unresolved"),
+        })
+
+    bl_b = before.get("blank_rows", 0)
+    bl_a = after.get("blank_rows", 0)
+    if bl_b or bl_a:
+        verdicts.append({
+            "issue": "blank_rows", "col": None, "before": bl_b, "after": bl_a,
+            "verdict": ("resolved" if bl_a == 0 else
+                        "new_issue" if bl_b == 0 else
+                        "partially_resolved" if bl_a < bl_b else "unresolved"),
         })
 
     for col, cb in before["columns"].items():

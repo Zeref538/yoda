@@ -33,6 +33,76 @@ def drop_duplicates(df: pd.DataFrame, col: str | None = None, params: dict | Non
 
 
 @_tool
+def drop_blank_rows(df: pd.DataFrame, col: str | None = None, params: dict | None = None):
+    """Remove rows that are entirely empty (or empty in `col` if given).
+
+    params.min_non_null (int): keep rows with at least this many non-null
+    cells (default 1 = drop only fully blank rows). Whitespace-only strings
+    count as blank. Index is preserved so callers can diff surviving rows.
+    """
+    params = params or {}
+    # Treat whitespace-only strings as null for blankness purposes.
+    with pd.option_context("future.no_silent_downcasting", True):
+        probe = df.replace(r"^\s*$", pd.NA, regex=True) if len(df) else df
+    if col:
+        keep = probe[col].notna()
+    else:
+        min_non_null = int(params.get("min_non_null", 1))
+        keep = probe.notna().sum(axis=1) >= min_non_null
+    out = df[keep]
+    return out, {"rows_affected": int(len(df) - len(out))}
+
+
+@_tool
+def drop_blank_columns(df: pd.DataFrame, col: str | None = None, params: dict | None = None):
+    """Remove columns that are entirely empty (all null / whitespace-only).
+
+    If `col` is given, drop that specific column instead (explicit user ask).
+    """
+    if col:
+        if col not in df.columns:
+            raise ValueError(f"column '{col}' does not exist")
+        out = df.drop(columns=[col])
+        return out, {"rows_affected": 0, "columns_dropped": [col]}
+    with pd.option_context("future.no_silent_downcasting", True):
+        probe = df.replace(r"^\s*$", pd.NA, regex=True) if len(df) else df
+    blank = [c for c in df.columns if probe[c].isna().all()]
+    out = df.drop(columns=blank)
+    return out, {"rows_affected": 0, "columns_dropped": [str(c) for c in blank]}
+
+
+@_tool
+def replace_values(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Find/replace within one column. params: find (required), replace
+    (default ""), regex (bool, default False), match_case (bool, default True).
+    Matches whole cell values unless regex=True (then it's a substring regex)."""
+    params = params or {}
+    if "find" not in params:
+        raise ValueError("replace_values needs params.find")
+    find = str(params["find"])
+    repl = str(params.get("replace", ""))
+    use_regex = bool(params.get("regex", False))
+    match_case = bool(params.get("match_case", True))
+    out = df.copy()
+    s = out[col].astype("string")
+    if use_regex:
+        flags = 0 if match_case else re.IGNORECASE
+        try:
+            rx = re.compile(find, flags)
+        except re.error as exc:
+            raise ValueError(f"invalid regex '{find}': {exc}") from exc
+        new = s.str.replace(rx, repl, regex=True)
+    else:
+        if match_case:
+            new = s.mask(s == find, repl)
+        else:
+            new = s.mask(s.str.lower() == find.lower(), repl)
+    n = int((new != s).fillna(False).sum())
+    out[col] = new.where(s.notna(), other=out[col])
+    return out, {"rows_affected": n}
+
+
+@_tool
 def normalize_dates(df: pd.DataFrame, col: str, params: dict | None = None):
     params = params or {}
     dayfirst = bool(params.get("dayfirst", False))

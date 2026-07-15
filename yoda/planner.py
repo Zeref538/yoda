@@ -24,6 +24,7 @@ TOOL_NAMES = [
     "drop_duplicates", "normalize_dates", "normalize_phone", "normalize_currency",
     "standardize_categories", "fix_dtypes", "impute_missing", "flag_outliers",
     "trim_whitespace", "validate_rule", "rename_columns",
+    "drop_blank_rows", "drop_blank_columns", "replace_values",
 ]
 
 PLAN_SCHEMA = {
@@ -70,10 +71,28 @@ Available tools (col = column to act on, null for whole-table tools):
   silently fill values. Use when null_pct > 0.
 - flag_outliers(col, params={"method": "iqr"}) — adds a flag column. Use for iqr_outliers.
 - validate_rule(col, params with min/max/allowed) — only when an obvious domain rule exists.
+- drop_blank_rows(col=null) — remove rows that are entirely empty. Use when the
+  profile has blank_rows > 0, or the user asks to remove blank/empty rows.
+  With col set, removes rows where THAT column is empty (only if the user asks).
+- drop_blank_columns(col=null) — remove columns that are entirely empty. Use when
+  the profile lists blank_columns, or the user asks. With col set, drops that
+  exact column (only when the user explicitly asks to delete it).
+- replace_values(col, params={"find": ..., "replace": ..., "regex": bool}) —
+  find/replace inside one column. Use ONLY when the user explicitly asks for a
+  replacement; never invent one.
 
 Rules: propose a step ONLY when the profile shows evidence for it. Do not invent
 columns. Do not clean what is not dirty — unnecessary changes are penalized.
 Each step needs a short "reason" citing the profile evidence.
+EXCEPTION: when the user gives an explicit instruction, satisfy it with the
+matching tool(s) even if the profile shows no signal for it — the human is the
+authority. Plain-language mapping: "remove/delete blank|empty rows" ->
+drop_blank_rows; "remove empty columns" -> drop_blank_columns; "delete column X"
+-> drop_blank_columns(col=X); "replace A with B in X" -> replace_values(col=X,
+params={"find":"A","replace":"B"}); "remove duplicates" -> drop_duplicates;
+"fix/standardize the dates" -> normalize_dates; "fill missing with the average"
+-> impute_missing(params={"strategy":"mean"}) (an explicit user ask is the ONE
+case where a strategy other than flag_only is allowed).
 
 Tool-choice examples (learn the signal -> tool mapping exactly):
 1. Profile shows: "price": {"currency_like_values": 25, "numeric_as_string": 180}
@@ -105,6 +124,13 @@ class RuleBasedPlanner:
         if any(info.get("non_snake_case_name") for info in cols.values()):
             steps.append({"tool": "rename_columns", "col": None, "params": {},
                           "reason": "non-snake_case column names"})
+
+        if profile.get("blank_rows"):
+            steps.append({"tool": "drop_blank_rows", "col": None, "params": {},
+                          "reason": f"{profile['blank_rows']} fully blank rows"})
+        if profile.get("blank_columns"):
+            steps.append({"tool": "drop_blank_columns", "col": None, "params": {},
+                          "reason": f"empty columns: {profile['blank_columns']}"})
 
         if profile["duplicates"]["full_row"] > 0:
             steps.append({"tool": "drop_duplicates", "col": None, "params": {},
@@ -170,9 +196,14 @@ class PlanValidationError(ValueError):
     pass
 
 
-def validate_plan(plan_obj: dict, profile: dict) -> list[dict]:
+def validate_plan(plan_obj: dict, profile: dict,
+                  allow_impute_fill: bool = False) -> list[dict]:
     """Schema + semantic validation. Raises PlanValidationError with a
-    message suitable for feeding back to the model on retry."""
+    message suitable for feeding back to the model on retry.
+
+    `allow_impute_fill` is True only when a human gave an explicit
+    instruction — the one case where impute strategies other than
+    flag_only are permitted."""
     jsonschema.validate(plan_obj, PLAN_SCHEMA)
     steps = plan_obj["steps"]
     known = set(profile["columns"])
@@ -180,17 +211,25 @@ def validate_plan(plan_obj: dict, profile: dict) -> list[dict]:
 
     for i, step in enumerate(steps):
         tool, col = step["tool"], step["col"]
-        if tool in ("drop_duplicates", "rename_columns"):
+        if tool == "replace_values" and "find" not in step["params"]:
+            raise PlanValidationError(
+                f"step {i}: replace_values requires params.find")
+        if tool in ("drop_duplicates", "rename_columns",
+                    "drop_blank_rows", "drop_blank_columns"):
+            if col is not None and col not in known:
+                raise PlanValidationError(
+                    f"step {i}: column '{col}' does not exist in the profile")
             continue
         if col is None:
             raise PlanValidationError(f"step {i}: tool '{tool}' requires a column")
         if col not in known:
             raise PlanValidationError(
                 f"step {i}: column '{col}' does not exist in the profile")
-        if tool == "impute_missing" and step["params"].get("strategy") not in (
-                None, "flag_only"):
+        if (tool == "impute_missing" and not allow_impute_fill
+                and step["params"].get("strategy") not in (None, "flag_only")):
             raise PlanValidationError(
-                f"step {i}: impute_missing must use strategy 'flag_only'")
+                f"step {i}: impute_missing must use strategy 'flag_only' "
+                "(fill strategies are only allowed when the user explicitly asks)")
     return steps
 
 
@@ -206,7 +245,7 @@ class LLMPlanner:
         self.timeout = timeout
         self.last_outcome: dict = {}  # telemetry for reports/benchmark
 
-    def _chat(self, messages: list[dict]) -> str:
+    def _chat(self, messages: list[dict], think: bool | None = None) -> str:
         payload = {
             "model": self.model,
             "messages": messages,
@@ -214,13 +253,27 @@ class LLMPlanner:
             "format": PLAN_SCHEMA,  # Ollama structured output
             "options": {"temperature": 0.1},
         }
+        if think is not None:
+            # Thinking models can return empty content under structured
+            # output; the interactive path disables thinking for fast,
+            # reliable JSON. (Benchmark path leaves this unset.)
+            payload["think"] = think
         req = urllib.request.Request(
             f"{self.host}/api/chat",
             data=json.dumps(payload).encode(),
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-            return json.loads(resp.read())["message"]["content"]
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                return json.loads(resp.read())["message"]["content"]
+        except urllib.error.HTTPError as exc:
+            if think is not None and exc.code == 400:
+                # Model doesn't accept the think parameter — resend without.
+                payload.pop("think")
+                req.data = json.dumps(payload).encode()
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    return json.loads(resp.read())["message"]["content"]
+            raise
 
     def plan(self, profile: dict, instruction: str | None = None,
              col: str | None = None) -> list[dict]:
@@ -239,9 +292,12 @@ class LLMPlanner:
         errors: list[str] = []
         for attempt in range(self.max_retries):
             try:
-                raw = self._chat(messages)
+                raw = self._chat(
+                    messages,
+                    think=False if (instruction or col) else None)
                 plan_obj = json.loads(raw)
-                steps = validate_plan(plan_obj, profile)
+                steps = validate_plan(plan_obj, profile,
+                                      allow_impute_fill=bool(instruction))
                 self.last_outcome = {"source": "llm", "attempts": attempt + 1,
                                      "errors": errors}
                 return steps

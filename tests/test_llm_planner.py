@@ -29,7 +29,7 @@ GOOD_PLAN = {"steps": [
 def make_planner(replies: list[str]) -> LLMPlanner:
     p = LLMPlanner(model="mock")
     it = iter(replies)
-    p._chat = lambda messages: next(it)
+    p._chat = lambda messages, think=None: next(it)
     return p
 
 

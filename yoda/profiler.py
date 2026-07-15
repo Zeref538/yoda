@@ -170,9 +170,42 @@ def profile(df: pd.DataFrame) -> dict:
         if n:
             dup_by_key[k] = n
 
-    return {
+    # Fully blank rows / columns (whitespace-only strings count as blank).
+    # Cheap path: str-regex only where a column could actually hold strings.
+    blank_rows, blank_columns = 0, []
+    if n_rows:
+        na = df.isna()
+        str_cols = [c for c in df.columns
+                    if pd.api.types.is_object_dtype(df[c])
+                    or pd.api.types.is_string_dtype(df[c])]
+        # Blank columns: all-null, or (string col) uniques are all whitespace.
+        for c in df.columns:
+            if na[c].all():
+                blank_columns.append(str(c))
+            elif c in str_cols:
+                uniq = df[c].dropna().unique()
+                if all(str(v).strip() == "" for v in uniq):
+                    blank_columns.append(str(c))
+        # Blank rows: start from rows null in every non-string column, then
+        # confirm string columns are null/whitespace only on those candidates.
+        non_str = [c for c in df.columns if c not in str_cols]
+        cand = na[non_str].all(axis=1) if non_str else pd.Series(True, index=df.index)
+        for c in str_cols:
+            if not cand.any():
+                break
+            sub = df.loc[cand, c]
+            ok = sub.isna() | sub.astype(str).str.strip().eq("")
+            cand.loc[cand] = ok
+        blank_rows = int(cand.sum())
+
+    out = {
         "n_rows": n_rows,
         "n_cols": len(df.columns),
         "columns": cols,
         "duplicates": {"full_row": dup_full, "by_key_candidate": dup_by_key},
     }
+    if blank_rows:
+        out["blank_rows"] = blank_rows
+    if blank_columns:
+        out["blank_columns"] = blank_columns
+    return out

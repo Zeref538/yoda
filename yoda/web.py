@@ -38,6 +38,11 @@ def _issues(prof: dict) -> list[dict]:
     if prof["duplicates"]["full_row"]:
         rows.append({"issue": "duplicate rows", "col": None,
                      "count": prof["duplicates"]["full_row"]})
+    if prof.get("blank_rows"):
+        rows.append({"issue": "blank rows", "col": None,
+                     "count": prof["blank_rows"]})
+    for bc in prof.get("blank_columns", []):
+        rows.append({"issue": "empty column", "col": bc, "count": "all rows"})
     for col, c in prof["columns"].items():
         if c.get("date_formats_seen") and set(c["date_formats_seen"]) - {"ISO (YYYY-MM-DD)"}:
             rows.append({"issue": "mixed date formats", "col": col,
@@ -200,7 +205,9 @@ def run(body: dict):
     steps = body.get("steps", [])
     source = S["cleaned"]
     try:
-        validate_plan({"steps": steps}, _cleaned_prof())
+        # Steps arriving here passed the human gate — that explicit approval
+        # is what permits impute fill strategies beyond flag_only.
+        validate_plan({"steps": steps}, _cleaned_prof(), allow_impute_fill=True)
     except Exception as exc:
         raise HTTPException(400, f"invalid plan: {exc}")
 

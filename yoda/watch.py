@@ -29,7 +29,9 @@ def process_file(path: Path, steps: list[dict], out_dir: Path,
     df = load(path)
     prof = profile(df)
     try:
-        validate_plan({"steps": steps}, prof)
+        # Recipes are saved from human-approved plans, so fill strategies
+        # (an explicit user ask) are already sanctioned.
+        validate_plan({"steps": steps}, prof, allow_impute_fill=True)
     except (PlanValidationError, Exception) as exc:  # noqa: B014 — jsonschema too
         return _quarantine(path, quarantine_dir,
                            f"recipe does not fit this file: {exc}")
