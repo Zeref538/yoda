@@ -483,6 +483,15 @@ def get_recipe():
             "steps": steps}
 
 
+@app.get("/api/scan")
+def pii_scan():
+    """PII inventory of the current data (counts only, values never leave)."""
+    if S.get("cleaned") is None:
+        raise HTTPException(400, "upload a file first")
+    from yoda.scan import scan as _scan
+    return _scan(S["cleaned"])
+
+
 @app.get("/api/report")
 def report():
     if not S.get("rounds"):

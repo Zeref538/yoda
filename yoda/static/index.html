@@ -5,224 +5,230 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YODA — Your Offline Data Agent</title>
 <style>
+  /* "Mission Control" — concept generated with Google Stitch (Technical
+     Precision design system), implemented by hand. Fully offline. */
   :root{
-    --bg:#0a0c10; --surface:#101318; --surface-2:#151a21; --border:#242b36;
-    --text:#e6edf3; --text-muted:#8b98a9;
-    --accent:#2dd4bf; --accent-dim:rgba(45,212,191,.12);
-    --accent-2:#38bdf8; --accent-2-dim:rgba(56,189,248,.12);
-    --ok:#22c55e; --ok-dim:rgba(34,197,94,.14);
-    --warn:#facc15; --warn-dim:rgba(250,204,21,.12);
-    --danger:#f87171; --danger-dim:rgba(248,113,113,.12);
+    --bg:#0a0c10; --surface:#111318; --surface-2:#16191f; --border:#333539;
+    --line:#1d2026; --text:#e2e2e8; --text-muted:#859490;
+    --accent:#3cddc7; --accent-dim:rgba(60,221,199,.10);
+    --accent-2:#7bd0ff; --accent-2-dim:rgba(123,208,255,.10);
+    --ok:#62fae3; --ok-dim:rgba(98,250,227,.08);
+    --warn:#ffd649; --warn-dim:rgba(255,214,73,.10);
+    --danger:#ffb4ab; --danger-dim:rgba(255,180,171,.10);
     --mono:"JetBrains Mono",ui-monospace,'Cascadia Code',Consolas,monospace;
-    --body:"Inter",system-ui,-apple-system,'Segoe UI',sans-serif;
+    --r:3px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html{color-scheme:dark}
-  body{background:var(--bg);color:var(--text);font-family:var(--body);
-       font-size:15px;line-height:1.6;height:100dvh;display:flex;
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);
+       font-size:13px;line-height:1.55;height:100dvh;display:flex;
        flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
   ::selection{background:var(--accent-dim);color:var(--accent)}
-  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar{width:9px;height:9px}
   ::-webkit-scrollbar-track{background:var(--bg)}
-  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:5px}
-  ::-webkit-scrollbar-thumb:hover{background:#2b3a4d}
+  ::-webkit-scrollbar-thumb{background:var(--border)}
+  ::-webkit-scrollbar-thumb:hover{background:#454a52}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
-  /* CRT atmosphere, straight from the portfolio */
-  body::after{content:"";position:fixed;inset:0;z-index:200;pointer-events:none;
-    background:repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0,
-      rgba(255,255,255,.02) 1px,transparent 1px,transparent 3px),
-      radial-gradient(ellipse 120% 90% at 50% 40%,transparent 62%,rgba(0,0,0,.35) 100%)}
+  .micro{text-transform:uppercase;letter-spacing:.14em;font-size:.62rem;
+         color:var(--text-muted)}
+  .hidden{display:none!important}
+  .grow{flex:1}
 
-  button{font:inherit;cursor:pointer;border-radius:8px;padding:.5rem 1rem;
+  button{font:inherit;cursor:pointer;border-radius:var(--r);padding:.42rem .85rem;
          border:1px solid var(--border);background:var(--surface-2);color:var(--text);
-         transition:border-color .18s,background .18s;min-height:40px}
-  button:hover{border-color:var(--accent)}
+         transition:border-color .15s,background .15s,color .15s;min-height:36px;
+         text-transform:uppercase;letter-spacing:.08em;font-size:.68rem}
+  button:hover{border-color:var(--accent);color:var(--accent)}
   button:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#04211c;font-weight:600}
-  button.primary:hover{background:#5eead4}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#04211c;
+         font-weight:700}
+  button.primary:hover{background:#62fae3;color:#04211c}
   button.ghost{background:transparent}
-  button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  button.small{min-height:28px;padding:.15rem .6rem;font-size:.62rem}
+  button:disabled{opacity:.4;cursor:not-allowed}
   input[type=text],textarea,select{font:inherit;background:var(--bg);color:var(--text);
-        border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem}
+        border:1px solid var(--border);border-radius:var(--r);padding:.5rem .7rem}
   input:focus-visible,textarea:focus-visible,select:focus-visible{
         outline:2px solid var(--accent-2);outline-offset:1px}
-  textarea{resize:vertical;min-height:4.2rem;width:100%}
-  .hidden{display:none!important}
-  .mono{font-family:var(--mono)}
+  textarea{resize:vertical;min-height:4.2rem;width:100%;font-size:.76rem}
 
-  /* ---------- top bar ---------- */
-  header{display:flex;align-items:center;gap:.9rem;padding:.65rem 1.1rem;
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;gap:1rem;padding:.55rem 1rem;
          background:var(--surface);border-bottom:1px solid var(--border);z-index:30}
-  .logo{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:1rem;
-        font-family:var(--mono);letter-spacing:.04em}
+  .logo{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:.95rem;
+        letter-spacing:.08em}
   .logo svg{color:var(--accent)}
-  .logo .sub{color:var(--text-muted);font-weight:400;font-size:.78rem}
-  .badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.7rem;
-         font-family:var(--mono);color:var(--accent-2);background:var(--accent-2-dim);
-         border:1px solid rgba(34,211,238,.4);border-radius:999px;padding:.12rem .6rem}
-  .pulse{width:.45rem;height:.45rem;border-radius:50%;background:var(--accent-2)}
-  .filechip{font-family:var(--mono);font-size:.78rem;color:var(--text-muted);
-         border:1px dashed var(--border);border-radius:8px;padding:.25rem .6rem}
-  .grow{flex:1}
-  header select.model{appearance:none;-webkit-appearance:none;width:11rem;
-     min-height:40px;font-family:var(--mono);font-size:.8rem;cursor:pointer;
+  nav.tabs{display:flex;gap:.2rem}
+  nav.tabs button{border:none;background:transparent;min-height:34px;
+        color:var(--text-muted);border-bottom:2px solid transparent;border-radius:0}
+  nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .filechip{font-size:.7rem;color:var(--text);background:var(--surface-2);
+         border:1px solid var(--border);border-radius:var(--r);padding:.26rem .6rem}
+  header select.model{appearance:none;-webkit-appearance:none;width:10rem;
+     min-height:36px;font-size:.72rem;cursor:pointer;
      background-color:var(--surface-2);color:var(--accent-2);
-     border:1px solid var(--border);border-radius:8px;padding:.45rem 2rem .45rem .7rem;
-     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b98a9' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-     background-repeat:no-repeat;background-position:right .6rem center}
-  header select.model:hover{border-color:var(--accent)}
+     border:1px solid var(--border);border-radius:var(--r);
+     padding:.38rem 1.9rem .38rem .65rem;
+     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23859490' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+     background-repeat:no-repeat;background-position:right .55rem center}
   header select.model option{background:var(--surface);color:var(--text)}
 
-  /* ---------- layout ---------- */
-  .stage{flex:1;display:flex;min-height:0}
-  .gridwrap{flex:1;overflow:auto;position:relative}
+  /* ---------- 3-column stage ---------- */
+  .stage{flex:1;display:grid;grid-template-columns:16.5rem 1fr 19rem;min-height:0}
+  @media (max-width:1100px){.stage{grid-template-columns:14rem 1fr}
+    .right{display:none}}
+  .left,.right{background:var(--surface);overflow-y:auto;padding:1rem;
+        display:flex;flex-direction:column;gap:1rem}
+  .left{border-right:1px solid var(--border)}
+  .right{border-left:1px solid var(--border)}
+  .center{overflow-y:auto;padding:1.25rem 1.5rem;display:flex;
+        flex-direction:column;gap:1.1rem}
 
-  /* ---------- empty state / dropzone ---------- */
-  .empty{height:100%;display:flex;flex-direction:column;align-items:center;
-         justify-content:center;gap:1rem;padding:2rem}
-  .drop{border:2px dashed var(--border);border-radius:14px;padding:3rem 3.5rem;
-        text-align:center;cursor:pointer;transition:border-color .2s,box-shadow .2s;
-        background:var(--surface)}
-  .drop:hover,.drop.over{border-color:var(--accent)}
-  .drop svg{color:var(--accent);margin-bottom:.75rem}
-  .drop .hint{color:var(--text-muted);font-size:.82rem;font-family:var(--mono)}
-  .empty .tag{font-family:var(--mono);color:var(--accent-2);font-size:.8rem;
-        display:flex;align-items:center;gap:.6rem}
-  .empty .tag::after{content:"";height:1px;width:56px;background:var(--border)}
+  .paneltitle{color:var(--accent);font-weight:700;font-size:.8rem;
+        letter-spacing:.06em}
+  .paneltitle small{display:block;color:var(--text-muted);font-weight:400;
+        font-size:.62rem;letter-spacing:.02em}
+  .seclabel{text-transform:uppercase;letter-spacing:.14em;font-size:.62rem;
+        color:var(--text-muted);display:flex;align-items:center;gap:.5rem}
+  .seclabel::after{content:"";height:1px;flex:1;background:var(--border)}
 
-  /* ---------- data grid ---------- */
-  table.grid{border-collapse:separate;border-spacing:0;font-size:.78rem;
-             font-family:var(--mono);white-space:nowrap}
-  .grid th,.grid td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);
-             padding:.28rem .6rem;max-width:16rem;overflow:hidden;text-overflow:ellipsis}
-  .grid thead th{position:sticky;top:0;z-index:10;background:var(--surface-2);
-             color:var(--text);font-weight:600;cursor:pointer;user-select:none;
-             transition:background .15s;text-align:left}
-  .grid thead th:hover{background:#182030}
-  .grid thead th.selected{background:var(--accent-dim);color:var(--accent);
-             box-shadow:inset 0 -2px 0 var(--accent)}
-  .grid thead th.newcol{color:var(--accent-2);box-shadow:inset 0 -2px 0 var(--accent-2)}
-  .grid thead th .cnt{display:inline-block;min-width:1.15rem;text-align:center;
-             margin-left:.4rem;font-size:.65rem;border-radius:999px;
-             background:var(--warn-dim);color:var(--warn);
-             border:1px solid rgba(250,204,21,.4);padding:0 .25rem}
-  .grid td{color:var(--text-muted)}
-  .grid td.rownum{position:sticky;left:0;background:var(--surface);color:#4b5a6d;
-             border-right:1px solid var(--border);z-index:5;font-size:.68rem}
-  .grid tbody tr:hover td{background:rgba(139,92,246,.05)}
-  .grid td.changed{background:var(--ok-dim);color:var(--ok)}
-  .grid td.newcell{background:var(--accent-2-dim);color:var(--accent-2)}
-  table.grid{user-select:none}
-  .grid td.sel{background:var(--accent-dim)!important;color:var(--text)}
-  .grid tr.selrow td{background:var(--accent-dim)!important;color:var(--text)}
-  .grid tr.selrow td.rownum{background:var(--accent);color:#04211c}
-  .grid td input,.grid th input{width:100%;font:inherit;background:var(--bg);
-        color:var(--text);border:1px solid var(--accent);border-radius:4px;
-        padding:.1rem .3rem;outline:none}
+  /* ---------- left: timeline + versions ---------- */
+  .tl{display:flex;flex-direction:column;gap:.1rem;position:relative}
+  .tl-item{display:flex;gap:.6rem;padding:.35rem 0;font-size:.68rem;
+        align-items:flex-start}
+  .tl-item .dot{width:.5rem;height:.5rem;border-radius:50%;margin-top:.3rem;
+        flex-shrink:0;background:var(--text-muted)}
+  .tl-item.k-upload .dot{background:var(--accent-2)}
+  .tl-item.k-ai .dot{background:var(--accent)}
+  .tl-item.k-manual .dot{background:var(--warn)}
+  .tl-item.k-revert .dot{background:var(--text-muted)}
+  .tl-item .when{color:var(--text-muted);font-size:.6rem}
+  .tl-item .lbl{line-height:1.4}
+  .tl-item button{margin-left:auto}
+  .ver-row{display:flex;align-items:center;gap:.4rem;font-size:.68rem;
+        padding:.3rem 0;border-bottom:1px solid var(--line)}
+  .ver-row .nm{color:var(--accent-2)}
 
-  /* legend + status bar */
-  .statusbar{display:flex;gap:1.1rem;align-items:center;padding:.45rem 1.1rem;
-       border-top:1px solid var(--border);background:var(--surface);
-       font-family:var(--mono);font-size:.72rem;color:var(--text-muted);flex-wrap:wrap}
-  .chip{display:inline-flex;align-items:center;gap:.35rem}
-  .sw{width:.75rem;height:.75rem;border-radius:3px;display:inline-block}
-  .sw.ok{background:var(--ok-dim);border:1px solid var(--ok)}
-  .sw.new{background:var(--accent-2-dim);border:1px solid var(--accent-2)}
-  .sw.warn{background:var(--warn-dim);border:1px solid var(--warn)}
+  /* ---------- center: cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));
+        gap:.8rem}
+  .card{background:var(--surface);border:1px solid var(--border);
+        border-radius:var(--r);padding:.85rem .9rem;cursor:pointer;
+        transition:border-color .15s;display:flex;flex-direction:column;gap:.45rem}
+  .card:hover{border-color:var(--accent)}
+  .card.active{border-color:var(--accent);background:var(--accent-dim)}
+  .card .k{font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;
+        color:var(--accent-2)}
+  .card .t{font-size:.92rem;font-weight:700;line-height:1.3}
+  .card .n{margin-left:auto;background:var(--warn);color:#221a00;font-weight:700;
+        border-radius:var(--r);font-size:.62rem;padding:.05rem .4rem}
+  .card .colname{color:var(--text-muted);font-size:.66rem}
+  .card .minibar{display:flex;gap:2px;align-items:flex-end;height:2rem}
+  .card .minibar i{flex:1;background:var(--accent);opacity:.35;min-height:2px}
+  .card .minibar i.hot{opacity:1}
 
-  /* ---------- left sidebar (collapsible) ---------- */
-  aside{width:0;overflow:hidden;background:var(--surface);
-        border-right:1px solid var(--border);display:flex;flex-direction:column;
-        transition:width .22s ease-out;position:relative;z-index:25;flex-shrink:0}
-  aside.open{width:23.5rem;max-width:85vw}
-  .rail{width:1.4rem;flex-shrink:0;background:var(--surface);
-        border-right:1px solid var(--border);display:flex;align-items:center;
-        justify-content:center}
-  .rail button{min-height:64px;width:100%;padding:0;border:none;border-radius:0;
-        background:transparent;color:var(--text-muted);font-size:.8rem}
-  .rail button:hover{color:var(--accent);background:var(--accent-dim)}
-  .drawer-head{display:flex;align-items:center;gap:.6rem;padding:.9rem 1rem;
-        border-bottom:1px solid var(--border)}
-  .drawer-head h2{font-size:.95rem;font-family:var(--mono);color:var(--accent)}
-  .drawer-body{flex:1;overflow-y:auto;padding:1rem;display:flex;
-        flex-direction:column;gap:.9rem}
-  .panel-label{font-family:var(--mono);font-size:.72rem;color:var(--accent-2);
-        letter-spacing:.06em;display:flex;align-items:center;gap:.5rem}
-  .panel-label::after{content:"";height:1px;flex:1;background:var(--border)}
-  .issue-line{display:flex;justify-content:space-between;font-size:.8rem;
-        padding:.3rem .5rem;background:var(--surface-2);border-radius:6px;
-        border:1px solid var(--border)}
-  .issue-line .n{font-family:var(--mono);color:var(--warn)}
-  .suggestion{border:1px solid var(--border);border-radius:10px;padding:.7rem .8rem;
-        background:var(--surface-2);display:flex;gap:.7rem;align-items:flex-start;
-        justify-content:space-between;cursor:pointer;
-        transition:border-color .18s,background .18s}
+  /* suggestions */
+  .suggestion{border:1px solid var(--border);border-left:2px solid var(--border);
+        border-radius:var(--r);padding:.7rem .8rem;background:var(--surface);
+        display:flex;gap:.7rem;align-items:flex-start;cursor:pointer;
+        transition:border-color .15s,background .15s}
   .suggestion:hover{border-color:var(--accent)}
-  .suggestion.on{border-color:var(--accent);background:var(--accent-dim)}
-  .suggestion .tick{flex-shrink:0;width:1.3rem;height:1.3rem;border-radius:50%;
+  .suggestion.on{border-color:var(--accent);border-left-color:var(--accent);
+        background:var(--accent-dim)}
+  .suggestion .tick{flex-shrink:0;width:1.15rem;height:1.15rem;border-radius:var(--r);
         border:1.5px solid var(--border);display:flex;align-items:center;
-        justify-content:center;color:transparent;font-size:.75rem;margin-top:.1rem;
-        transition:border-color .18s,background .18s,color .18s}
+        justify-content:center;color:transparent;font-size:.68rem;margin-top:.1rem}
   .suggestion.on .tick{background:var(--accent);border-color:var(--accent);color:#04211c}
-  .suggestion .tool{font-family:var(--mono);font-weight:600;color:var(--accent)}
-  .suggestion .on-col{font-family:var(--mono);color:var(--accent-2);font-size:.78rem}
-  .suggestion .why{color:var(--text-muted);font-size:.78rem;margin-top:.15rem}
-  .thinking{display:flex;align-items:center;gap:.6rem;font-family:var(--mono);
-        font-size:.8rem;color:var(--accent-2)}
-  .spinner{width:1rem;height:1rem;border:2px solid var(--border);flex-shrink:0;
-        border-top-color:var(--accent-2);border-radius:50%;animation:spin .8s linear infinite}
+  .suggestion .tool{font-weight:700;color:var(--accent);font-size:.76rem}
+  .suggestion .on-col{color:var(--accent-2);font-size:.68rem}
+  .suggestion .why{color:var(--text-muted);font-size:.68rem;margin-top:.2rem;
+        line-height:1.45}
+  .thinking{display:flex;align-items:center;gap:.6rem;font-size:.72rem;
+        color:var(--accent-2)}
+  .spinner{width:.9rem;height:.9rem;border:2px solid var(--border);flex-shrink:0;
+        border-top-color:var(--accent-2);border-radius:50%;
+        animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .verdict{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;
-        padding:.28rem .5rem;border-radius:6px;background:var(--surface-2);
+  .verdict{display:flex;justify-content:space-between;gap:.5rem;font-size:.68rem;
+        padding:.32rem .6rem;border-radius:var(--r);background:var(--surface);
         border:1px solid var(--border)}
   .v-resolved{color:var(--ok)} .v-flagged{color:var(--accent-2)}
   .v-partially_resolved{color:var(--warn)}
   .v-unresolved,.v-new_issue{color:var(--danger)}
-  .errbox{color:var(--danger);background:var(--danger-dim);border:1px solid var(--danger);
-        border-radius:8px;padding:.5rem .7rem;font-size:.8rem}
-  .notebox{color:var(--text-muted);font-size:.75rem;border-left:2px solid var(--accent);
-        padding:.3rem .7rem;background:var(--accent-dim);border-radius:0 6px 6px 0}
+  .errbox{color:var(--danger);background:var(--danger-dim);
+        border:1px solid var(--danger);border-radius:var(--r);
+        padding:.5rem .7rem;font-size:.72rem}
+  .notebox{color:var(--text-muted);font-size:.66rem;border-left:2px solid var(--accent);
+        padding:.35rem .7rem;background:var(--surface);line-height:1.5}
 
-  /* ---------- column stats bars ---------- */
-  .stat-chips{display:flex;gap:.4rem;flex-wrap:wrap;font-family:var(--mono);font-size:.7rem}
-  .stat-chips span{border:1px solid var(--border);border-radius:6px;
-        padding:.1rem .5rem;color:var(--text-muted);background:var(--surface-2)}
-  .bar-row{display:grid;grid-template-columns:minmax(4rem,40%) 1fr 2.5rem;
-        gap:.5rem;align-items:center;font-size:.7rem;font-family:var(--mono)}
+  /* ---------- right: raw buffer + entropy ---------- */
+  .buffer{border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .buffer table{border-collapse:collapse;width:100%;font-size:.62rem;
+        white-space:nowrap;table-layout:fixed}
+  .buffer th{background:var(--surface-2);text-align:left;padding:.25rem .45rem;
+        text-transform:uppercase;letter-spacing:.06em;font-size:.56rem;
+        color:var(--text-muted);border-bottom:1px solid var(--border);
+        overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .buffer th:hover{color:var(--accent)}
+  .buffer th.selected{color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+  .buffer td{padding:.22rem .45rem;border-bottom:1px solid var(--line);
+        color:var(--text-muted);overflow:hidden;text-overflow:ellipsis}
+  .buffer td.changed{background:var(--ok-dim);color:var(--ok)}
+  .buffer td.newcell{background:var(--accent-2-dim);color:var(--accent-2)}
+  .buffer td input{width:100%;font:inherit;background:var(--bg);color:var(--text);
+        border:1px solid var(--accent);border-radius:var(--r);padding:0 .2rem}
+  .entropy{display:grid;grid-template-columns:repeat(auto-fill,minmax(.85rem,1fr));
+        gap:3px}
+  .entropy i{aspect-ratio:1;border-radius:1px;background:var(--surface-2)}
+  .stat-tiles{display:grid;grid-template-columns:1fr 1fr;gap:.45rem}
+  .stat-tiles span{border:1px solid var(--border);border-radius:var(--r);
+        padding:.4rem .55rem;background:var(--surface-2);font-size:.78rem}
+  .stat-tiles b{display:block;font-size:.56rem;color:var(--text-muted);
+        text-transform:uppercase;letter-spacing:.14em;font-weight:400}
+  .bar-row{display:grid;grid-template-columns:minmax(3.5rem,40%) 1fr 2.2rem;
+        gap:.45rem;align-items:center;font-size:.6rem}
   .bar-row .lbl{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;
         white-space:nowrap;text-align:right}
-  .bar-row .track{background:var(--surface-2);border-radius:3px;height:.7rem}
-  .bar-row .fill{background:var(--accent);opacity:.75;height:100%;border-radius:3px}
+  .bar-row .track{background:var(--surface-2);height:.55rem}
+  .bar-row .fill{background:var(--accent);opacity:.8;height:100%}
   .bar-row .n{color:var(--text-muted);text-align:right}
 
-  /* ---------- context menu ---------- */
-  .ctx{position:fixed;z-index:120;min-width:15rem;background:var(--surface-2);
-       border:1px solid var(--border);border-radius:10px;padding:.35rem;
-       box-shadow:0 8px 30px rgba(0,0,0,.55);font-size:.8rem}
-  .ctx .head{font-family:var(--mono);font-size:.68rem;color:var(--accent-2);
-       padding:.35rem .7rem .25rem;letter-spacing:.05em}
-  .ctx .item{display:flex;align-items:center;gap:.55rem;width:100%;text-align:left;
-       border:none;background:transparent;border-radius:6px;padding:.42rem .7rem;
-       min-height:0;color:var(--text);cursor:pointer}
-  .ctx .item:hover{background:var(--accent-dim);color:var(--accent)}
-  .ctx .item .mono-tag{margin-left:auto;font-family:var(--mono);font-size:.65rem;
-       color:var(--text-muted)}
-  .ctx hr{border:none;border-top:1px solid var(--border);margin:.3rem .4rem}
+  /* ---------- dropzone ---------- */
+  .empty{height:100%;display:flex;flex-direction:column;align-items:center;
+         justify-content:center;gap:1.1rem;padding:2rem}
+  .drop{border:1px dashed var(--border);border-radius:var(--r);
+        padding:3rem 3.5rem;text-align:center;cursor:pointer;
+        transition:border-color .2s;background:var(--surface)}
+  .drop:hover,.drop.over{border-color:var(--accent)}
+  .drop svg{color:var(--accent);margin-bottom:.75rem}
+  .drop .hint{color:var(--text-muted);font-size:.72rem}
 
-  /* ---------- report modal ---------- */
-  .modal{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);
+  /* ---------- statusbar / modal / toast / ctx ---------- */
+  .statusbar{display:flex;gap:1.2rem;align-items:center;padding:.4rem 1rem;
+       border-top:1px solid var(--border);background:var(--surface);
+       font-size:.62rem;color:var(--text-muted);flex-wrap:wrap;
+       text-transform:uppercase;letter-spacing:.1em}
+  .statusbar .lit{color:var(--accent)}
+  .modal{position:fixed;inset:0;z-index:100;background:rgba(4,6,9,.72);
         display:flex;align-items:center;justify-content:center;padding:2rem}
   .modal .inner{background:var(--surface);border:1px solid var(--border);
-        border-radius:14px;max-width:56rem;width:100%;max-height:85dvh;
+        border-radius:var(--r);max-width:56rem;width:100%;max-height:85dvh;
         display:flex;flex-direction:column}
-  .modal .inner header{border-radius:14px 14px 0 0}
-  .modal pre{flex:1;overflow:auto;padding:1.2rem;font-family:var(--mono);
-        font-size:.76rem;white-space:pre-wrap;color:var(--text-muted)}
-  .toast{position:fixed;bottom:4rem;left:50%;transform:translateX(-50%);z-index:150;
-        background:var(--surface-2);border:1px solid var(--accent);color:var(--text);
-        border-radius:10px;padding:.6rem 1.1rem;font-size:.82rem;
-        box-shadow:0 0 24px var(--accent-dim)}
+  .modal pre{flex:1;overflow:auto;padding:1.2rem;font-size:.7rem;
+        white-space:pre-wrap;color:var(--text-muted)}
+  .toast{position:fixed;bottom:3.4rem;left:50%;transform:translateX(-50%);
+        z-index:150;background:var(--surface-2);border:1px solid var(--accent);
+        border-left:3px solid var(--accent);color:var(--text);
+        border-radius:var(--r);padding:.55rem 1rem;font-size:.72rem}
+  .ctx{position:fixed;z-index:120;min-width:14rem;background:var(--surface-2);
+       border:1px solid var(--border);border-radius:var(--r);padding:.3rem;
+       box-shadow:0 10px 34px rgba(0,0,0,.6)}
+  .ctx .item{display:flex;width:100%;text-align:left;border:none;
+       background:transparent;border-radius:var(--r);padding:.42rem .7rem;
+       min-height:0;color:var(--text);cursor:pointer;text-transform:none;
+       letter-spacing:0;font-size:.74rem}
+  .ctx .item:hover{background:var(--accent-dim);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -231,100 +237,168 @@
   <div class="logo">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
-    </svg>
-    YODA <span class="sub">// your offline data agent</span>
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+    YODA
   </div>
-  <span class="badge"><span class="pulse"></span>100% LOCAL</span>
+  <nav class="tabs" role="tablist">
+    <button class="active" data-tab="pipeline" role="tab" aria-selected="true">Pipeline</button>
+    <button data-tab="recipes" role="tab" aria-selected="false">Recipes</button>
+    <button data-tab="exports" role="tab" aria-selected="false">Exports</button>
+  </nav>
   <span class="filechip hidden" id="filechip"></span>
   <div class="grow"></div>
-  <select class="model" id="model" aria-label="Ollama model" title="Ollama model">
+  <span class="micro" style="color:var(--accent)">model:</span>
+  <select class="model" id="model" aria-label="Ollama model">
     <option value="qwen3.5:4b">qwen3.5:4b</option>
   </select>
   <button id="btn-undo" class="ghost hidden" title="Undo last change (Ctrl+Z)">Undo</button>
-  <button id="btn-history" class="ghost hidden" title="Timeline and saved versions">History</button>
-  <button id="btn-clean-all" class="primary hidden">Clean everything</button>
-  <button id="btn-recipe" class="ghost hidden" title="Save or apply a cleaning recipe">Recipe</button>
-  <button id="btn-report" class="ghost hidden">Report</button>
-  <a id="dl" href="/api/download" download class="hidden"><button class="ghost">CSV</button></a>
-  <a id="dlx" href="/api/download_xlsx" download class="hidden">
-    <button class="ghost" title="Excel: cleaned data + audit log + verification">Excel</button></a>
-  <input type="file" id="recipe-file" accept=".json" hidden>
-  <button id="btn-new" class="ghost hidden" title="Start over with a new file">New file</button>
+  <button id="btn-new" class="ghost hidden" title="Start over with a new file">New</button>
 </header>
 
 <div class="stage">
-  <!-- left sidebar -->
-  <aside id="drawer" aria-label="AI assistant panel">
-    <div class="drawer-head">
-      <h2 id="drawer-title">assistant</h2>
-      <div class="grow"></div>
+
+  <!-- LEFT: mission control -->
+  <div class="left">
+    <div class="paneltitle">Mission Control
+      <small>offline agent v0.2.0</small></div>
+    <div class="seclabel">history timeline</div>
+    <div class="tl" id="timeline">
+      <div class="notebox">Load a file to begin. Every AI round, manual edit
+        and revert lands here — the original is always one click away.</div>
     </div>
-    <div class="drawer-body" id="drawer-body">
-      <div class="notebox">Load a file, then click a column header — or use
-        <strong>Clean everything</strong> — to get AI suggestions here.</div>
+    <div class="seclabel">saved versions</div>
+    <div id="versions"><div class="notebox">none yet</div></div>
+    <div style="display:flex;gap:.4rem">
+      <input type="text" id="version-name" placeholder="version name"
+             style="flex:1;min-width:0;font-size:.7rem" aria-label="New version name">
+      <button class="small" id="btn-save-version">Save</button>
     </div>
-  </aside>
-  <div class="rail">
-    <button id="drawer-toggle" aria-label="Open or close the assistant panel"
-            aria-expanded="false" title="Open/close panel">&rsaquo;</button>
   </div>
 
-  <div class="gridwrap" id="gridwrap">
-    <!-- empty state -->
-    <div class="empty" id="empty">
-      <div class="tag">01 // load your data</div>
-      <div class="drop" id="drop" role="button" tabindex="0"
-           aria-label="Upload a CSV, Excel or SQLite file">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-          <polyline points="14 2 14 8 20 8"/></svg>
-        <div><strong>Drop a file</strong> or click to browse</div>
-        <div class="hint">.csv &middot; .xlsx &middot; .sqlite — never leaves this machine</div>
-        <input type="file" id="file" accept=".csv,.xlsx,.xls,.sqlite,.db,.sqlite3,.parquet" hidden>
+  <!-- CENTER: pipeline -->
+  <div class="center" id="center">
+    <!-- pipeline tab -->
+    <div id="tab-pipeline">
+      <div class="empty" id="empty">
+        <div class="micro" style="color:var(--accent-2)">01 // load your data</div>
+        <div class="drop" id="drop" role="button" tabindex="0"
+             aria-label="Upload a CSV, Excel, SQLite or Parquet file">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <polyline points="14 2 14 8 20 8"/></svg>
+          <div><strong>Drop a file</strong> or click to browse</div>
+          <div class="hint">.csv · .xlsx · .sqlite · .parquet — never leaves this machine</div>
+          <input type="file" id="file"
+                 accept=".csv,.xlsx,.xls,.sqlite,.db,.sqlite3,.parquet" hidden>
+        </div>
+        <div class="hint micro" style="max-width:30rem;text-align:center;line-height:1.7">
+          The AI plans repairs from redacted statistics only — raw rows never
+          reach the model. You approve every step before it runs.</div>
       </div>
-      <div class="hint" style="color:var(--text-muted);font-size:.8rem;max-width:26rem;text-align:center">
-        Once loaded, <strong style="color:var(--text)">click any column header</strong> to tell
-        the AI what to do with it. The model only ever sees redacted statistics — not your rows.
+
+      <div id="pipeline" class="hidden" style="display:flex;flex-direction:column;gap:1.1rem">
+        <div>
+          <div class="paneltitle" style="font-size:1rem">Pipeline Analysis</div>
+          <div class="micro" id="analysis-sub"></div>
+        </div>
+        <div class="cards" id="issue-cards"></div>
+
+        <div class="seclabel">ask the agent</div>
+        <textarea id="instruction"
+          placeholder="optional — e.g. normalize all dates to ISO, but don't touch the email column…"
+          aria-label="Instruction for the AI"></textarea>
+        <div style="display:flex;gap:.6rem;align-items:center">
+          <button class="primary" id="btn-suggest" style="flex:1">Run analysis</button>
+          <span class="micro" id="scope-note"></span>
+        </div>
+        <div id="think" class="hidden thinking"><span class="spinner"></span>
+          <span id="think-word" class="grow"></span>
+          <button class="ghost small" id="btn-cancel">Cancel</button></div>
+        <div id="sugg-error"></div>
+
+        <div id="solutions" class="hidden" style="display:flex;flex-direction:column;gap:.6rem">
+          <div class="seclabel">ai proposed solutions — approve to execute</div>
+          <div id="sugg-box" style="display:flex;flex-direction:column;gap:.6rem"></div>
+        </div>
+
+        <div id="verify-box" class="hidden" style="display:flex;flex-direction:column;gap:.45rem">
+          <div class="seclabel">verification</div>
+          <div id="verdicts" style="display:flex;flex-direction:column;gap:.4rem"></div>
+        </div>
       </div>
     </div>
-    <!-- data grid -->
-    <table class="grid hidden" id="grid" aria-label="Data grid"></table>
-  </div>
-</div>
 
-<div class="statusbar" id="statusbar">
-  <span id="status-text">no file loaded</span>
-  <div class="grow"></div>
-  <span class="chip hidden legend"><span class="sw ok"></span>changed by YODA</span>
-  <span class="chip hidden legend"><span class="sw new"></span>new column</span>
-  <span class="chip hidden legend"><span class="sw warn"></span>issues in column</span>
-</div>
-
-<div class="modal hidden" id="hist-modal">
-  <div class="inner" style="max-width:38rem">
-    <header><div class="logo">history &amp; versions</div><div class="grow"></div>
-      <button class="ghost" id="hist-close" aria-label="Close history">&#10005;</button></header>
-    <div style="flex:1;overflow:auto;padding:1.1rem;display:flex;flex-direction:column;gap:1rem">
-      <div class="panel-label">timeline — revert to any point</div>
-      <div id="timeline-box" style="display:flex;flex-direction:column;gap:.45rem"></div>
-      <div class="panel-label">versions — named copies, original untouched</div>
+    <!-- recipes tab -->
+    <div id="tab-recipes" class="hidden" style="display:flex;flex-direction:column;gap:1rem">
+      <div class="paneltitle" style="font-size:1rem">Recipes</div>
+      <div class="notebox">A recipe is a cleaning plan you already approved —
+        save it once, replay it on next week's file, or feed it to
+        <span style="color:var(--accent)">yoda watch</span> for a self-cleaning
+        drop folder.</div>
       <div style="display:flex;gap:.6rem">
-        <input type="text" id="version-name" placeholder="version name, e.g. before-dedupe"
-               style="flex:1" aria-label="New version name">
-        <button class="primary" id="btn-save-version">Save version</button>
+        <button class="primary" id="btn-save-recipe">Save applied steps as recipe</button>
+        <button id="btn-apply-recipe">Apply a recipe file…</button>
+        <input type="file" id="recipe-file" accept=".json" hidden>
       </div>
-      <div id="versions-box" style="display:flex;flex-direction:column;gap:.45rem"></div>
+      <div id="recipe-info" class="micro"></div>
+    </div>
+
+    <!-- exports tab -->
+    <div id="tab-exports" class="hidden" style="display:flex;flex-direction:column;gap:1rem">
+      <div class="paneltitle" style="font-size:1rem">Exports</div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <a id="dl" href="/api/download" download><button class="primary">Cleaned CSV</button></a>
+        <a id="dlx" href="/api/download_xlsx" download>
+          <button title="cleaned data + audit log + verification">Excel bundle</button></a>
+        <button id="btn-report">View report</button>
+      </div>
+      <div class="seclabel">pii scan</div>
+      <div id="pii-box" style="display:flex;flex-direction:column;gap:.4rem">
+        <div class="notebox">load a file first</div></div>
+      <pre class="hidden" id="report-pre"
+           style="background:var(--surface);border:1px solid var(--border);
+                  border-radius:var(--r);padding:1rem;font-size:.7rem;
+                  white-space:pre-wrap;max-height:24rem;overflow:auto"></pre>
     </div>
   </div>
+
+  <!-- RIGHT: local intel -->
+  <div class="right">
+    <div class="paneltitle">Local Intel
+      <small id="intel-sub">no data loaded</small></div>
+    <div class="seclabel">raw buffer <span id="buffer-n"></span></div>
+    <div class="buffer" id="buffer">
+      <div class="notebox" style="border:none">A small preview renders here —
+        the full data stays in local memory. Double-click a cell to edit.</div>
+    </div>
+    <div class="seclabel">issue density by column</div>
+    <div class="entropy" id="entropy" title="teal = clean, yellow = issues"></div>
+    <div class="seclabel">selected column</div>
+    <div id="colstats"><div class="notebox">click a column in the raw buffer
+      or an issue card</div></div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span class="lit">
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+         style="vertical-align:-1px">
+      <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    secure offline status: active</span>
+  <span id="pii-status"></span>
+  <div class="grow"></div>
+  <span id="status-text">no file loaded</span>
 </div>
 
 <div class="modal hidden" id="modal">
   <div class="inner">
-    <header><div class="logo">cleaning report</div><div class="grow"></div>
-      <button class="ghost" id="modal-close" aria-label="Close report">&#10005;</button></header>
-    <pre id="report-pre"></pre>
+    <header style="border:none;border-bottom:1px solid var(--border)">
+      <div class="logo" style="font-size:.8rem">cleaning report</div>
+      <div class="grow"></div>
+      <button class="ghost small" id="modal-close" aria-label="Close">&#10005;</button></header>
+    <pre id="modal-pre"></pre>
   </div>
 </div>
 
@@ -332,7 +406,7 @@
 "use strict";
 const $ = s => document.querySelector(s);
 const state = {grid:null, issues:[], suggestions:[], selectedCol:null,
-               busy:false, rounds:0, verdicts:[], followup:[]};
+               busy:false, verdicts:[], appliedAny:false};
 
 /* ---------- helpers ---------- */
 async function api(url, opts){
@@ -348,6 +422,29 @@ function toast(msg){
 }
 function esc(s){const d=document.createElement("span");d.textContent=s;return d.innerHTML;}
 
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav.tabs button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("nav.tabs button").forEach(x=>{
+      x.classList.toggle("active", x===b);
+      x.setAttribute("aria-selected", x===b);
+    });
+    ["pipeline","recipes","exports"].forEach(t=>
+      $("#tab-"+t).classList.toggle("hidden", b.dataset.tab!==t));
+    if(b.dataset.tab==="exports" && state.grid) loadPII();
+  });
+});
+
+/* ---------- installed models ---------- */
+(async ()=>{
+  try{
+    const d = await (await fetch("/api/models")).json();
+    if(d.models.length)
+      $("#model").innerHTML = d.models.map(m=>
+        `<option value="${esc(m)}"${m==="qwen3.5:4b"?" selected":""}>${esc(m)}</option>`).join("");
+  }catch(e){}
+})();
+
 /* ---------- upload ---------- */
 const drop = $("#drop"), fileInput = $("#file");
 drop.addEventListener("click", ()=>fileInput.click());
@@ -362,143 +459,119 @@ async function upload(file){
   try{
     const fd = new FormData(); fd.append("file", file);
     const d = await (await api("/api/upload",{method:"POST",body:fd})).json();
-    state.grid = d.grid; state.issues = d.issues; state.rounds = 0;
-    state.verdicts = []; state.followup = []; state.suggestions = [];
-    $("#filechip").textContent = `${d.name} · ${d.n_rows}×${d.n_cols}`;
-    ["#filechip","#btn-clean-all","#btn-new","#btn-history","#btn-recipe"]
-      .forEach(s=>$(s).classList.remove("hidden"));
+    state.grid = d.grid; state.issues = d.issues; state.verdicts = [];
+    state.suggestions = []; state.selectedCol = null; state.appliedAny = false;
+    $("#filechip").textContent = `${d.name} (${d.n_rows} rows)`;
+    ["#filechip","#btn-new"].forEach(s=>$(s).classList.remove("hidden"));
     $("#btn-undo").classList.add("hidden");
-    $("#empty").classList.add("hidden"); $("#grid").classList.remove("hidden");
-    document.querySelectorAll(".legend").forEach(el=>el.classList.remove("hidden"));
-    renderGrid();
+    $("#empty").classList.add("hidden");
+    $("#pipeline").classList.remove("hidden");
+    $("#solutions").classList.add("hidden");
+    $("#verify-box").classList.add("hidden");
+    $("#intel-sub").textContent = `${d.n_rows} rows × ${d.n_cols} cols in local memory`;
+    $("#analysis-sub").textContent =
+      `${d.issues.length} issue signal(s) detected by the profiler — no AI involved yet`;
+    renderIssueCards(); renderBuffer(); renderEntropy(); loadTimeline(); loadPII();
     $("#status-text").textContent =
-      `${d.n_rows} rows · ${d.n_cols} columns · ${d.issues.length} issue signal(s) — click a column header to start`;
-    toast(`${d.issues.length} issue signals found — click a highlighted column`);
+      `${d.n_rows} rows · ${d.n_cols} columns · ${d.issues.length} issue signals`;
   }catch(e){ $("#status-text").textContent = "error"; toast("Upload failed: "+e.message); }
 }
+$("#btn-new").addEventListener("click", ()=>location.reload());
 
-/* ---------- grid ---------- */
-function issueCount(col){ return state.issues.filter(i=>i.col===col).length; }
-
-function renderGrid(){
-  const g = state.grid, table = $("#grid");
-  const changed = g.changed || {}, newCols = new Set(g.new_cols||[]);
-  let html = "<thead><tr><th style='cursor:default'></th>";
-  g.columns.forEach(c=>{
-    const n = issueCount(c);
-    const cls = [c===state.selectedCol?"selected":"", newCols.has(c)?"newcol":""].join(" ");
-    html += `<th class="${cls}" data-col="${esc(c)}" tabindex="0" role="button"
-              aria-label="Column ${esc(c)}${n?`, ${n} issues`:""}. Click to open AI panel.">
-              ${esc(c)}${n?`<span class="cnt">${n}</span>`:""}</th>`;
+/* ---------- issue cards ---------- */
+function renderIssueCards(){
+  const box = $("#issue-cards");
+  if(!state.issues.length){
+    box.innerHTML = `<div class="notebox">profiler found nothing suspicious —
+      you can still ask the agent below</div>`;
+    return;
+  }
+  box.innerHTML = state.issues.map((i,idx)=>`
+    <div class="card${state.selectedCol && i.col===state.selectedCol ? " active":""}"
+         data-i="${idx}" tabindex="0" role="button"
+         aria-label="${esc(i.issue)} in ${esc(i.col??'whole table')}">
+      <div style="display:flex;align-items:baseline;gap:.5rem">
+        <span class="k">issue</span><span class="n">${esc(String(i.count))}</span></div>
+      <div class="t">${esc(i.issue)}</div>
+      <div class="colname">${i.col?esc(i.col):"whole table"}</div>
+    </div>`).join("");
+  box.querySelectorAll(".card").forEach(c=>{
+    const pick = ()=>{
+      const iss = state.issues[+c.dataset.i];
+      state.selectedCol = iss.col || null;
+      $("#scope-note").textContent = iss.col ? `scope: ${iss.col}` : "scope: whole table";
+      renderIssueCards();
+      if(iss.col) loadColStats(iss.col);
+      highlightBufferCol();
+    };
+    c.addEventListener("click", pick);
+    c.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
   });
+}
+
+/* ---------- raw buffer (small preview) ---------- */
+const BUFFER_ROWS = 8;
+function renderBuffer(){
+  const g = state.grid, box = $("#buffer");
+  if(!g){ return; }
+  const changed = g.changed||{}, newCols = new Set(g.new_cols||[]);
+  const cols = g.columns;
+  let html = "<table><thead><tr>";
+  cols.forEach(c=>html += `<th data-col="${esc(c)}" title="${esc(c)}"
+      class="${c===state.selectedCol?"selected":""}">${esc(c)}</th>`);
   html += "</tr></thead><tbody>";
-  g.rows.forEach((r,ri)=>{
-    html += `<tr data-r="${ri}" data-rid="${r.rid}"><td class="rownum">${r.rid+1}</td>`;
+  g.rows.slice(0, BUFFER_ROWS).forEach(r=>{
+    html += `<tr data-rid="${r.rid}">`;
     r.cells.forEach((v,ci)=>{
-      const col = g.columns[ci];
-      const isChanged = (changed[col]||[]).includes(r.rid);
-      const cls = newCols.has(col) ? "newcell" : isChanged ? "changed" : "";
-      const was = isChanged ? (g.before?.[col]?.[String(r.rid)]) : undefined;
-      const tip = was!==undefined ? `was: ${was||"(empty)"}` : v;
-      html += `<td class="${cls}" data-c="${ci}" title="${esc(tip)}">${esc(v)}</td>`;
+      const col = cols[ci];
+      const isCh = (changed[col]||[]).includes(r.rid);
+      const cls = newCols.has(col) ? "newcell" : isCh ? "changed" : "";
+      const was = isCh ? g.before?.[col]?.[String(r.rid)] : undefined;
+      html += `<td class="${cls}" data-c="${ci}"
+        title="${esc(was!==undefined?`was: ${was||"(empty)"}`:v)}">${esc(v)}</td>`;
     });
     html += "</tr>";
   });
-  html += "</tbody>";
-  table.innerHTML = html;
-  table.querySelectorAll("thead th[data-col]").forEach(th=>{
-    th.addEventListener("click", ()=>openColumn(th.dataset.col));
-    th.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openColumn(th.dataset.col);}});
-    th.addEventListener("dblclick", e=>{e.stopPropagation();renameColInline(th);});
+  html += "</tbody></table>";
+  box.innerHTML = html;
+  $("#buffer-n").textContent = `(head ${Math.min(BUFFER_ROWS, g.rows.length)} of ${g.n_total_rows})`;
+  box.querySelectorAll("th").forEach(th=>{
+    th.addEventListener("click", ()=>{
+      state.selectedCol = th.dataset.col;
+      $("#scope-note").textContent = `scope: ${th.dataset.col}`;
+      loadColStats(th.dataset.col); renderIssueCards(); highlightBufferCol();
+    });
   });
-  applySelection();
+  box.querySelectorAll("td").forEach(td=>{
+    td.addEventListener("dblclick", ()=>editCellInline(td));
+  });
 }
-
-/* ---------- excel-style selection & editing ---------- */
-const sel = {mode:null, r1:0, c1:0, r2:0, c2:0, rows:new Set(), lastRow:null};
-let dragging = false, editing = false;
-
-function clearSel(){ sel.mode = null; sel.rows.clear(); applySelection(); }
-function applySelection(){
-  const table = $("#grid");
-  table.querySelectorAll("td.sel").forEach(td=>td.classList.remove("sel"));
-  table.querySelectorAll("tr.selrow").forEach(tr=>tr.classList.remove("selrow"));
-  if(sel.mode==="cells"){
-    const [ra,rb] = [Math.min(sel.r1,sel.r2), Math.max(sel.r1,sel.r2)];
-    const [ca,cb] = [Math.min(sel.c1,sel.c2), Math.max(sel.c1,sel.c2)];
-    table.querySelectorAll("tbody tr").forEach(tr=>{
-      const r = +tr.dataset.r;
-      if(r<ra||r>rb) return;
-      tr.querySelectorAll("td[data-c]").forEach(td=>{
-        const c = +td.dataset.c;
-        if(c>=ca && c<=cb) td.classList.add("sel");
-      });
-    });
-  }else if(sel.mode==="rows"){
-    table.querySelectorAll("tbody tr").forEach(tr=>{
-      if(sel.rows.has(+tr.dataset.rid)) tr.classList.add("selrow");
-    });
-  }
+function highlightBufferCol(){
+  document.querySelectorAll("#buffer th").forEach(th=>
+    th.classList.toggle("selected", th.dataset.col===state.selectedCol));
 }
-function selectedCells(){
-  if(sel.mode!=="cells") return [];
-  const g = state.grid, out = [];
-  const [ra,rb] = [Math.min(sel.r1,sel.r2), Math.max(sel.r1,sel.r2)];
-  const [ca,cb] = [Math.min(sel.c1,sel.c2), Math.max(sel.c1,sel.c2)];
-  for(let r=ra;r<=rb;r++) for(let c=ca;c<=cb;c++)
-    if(g.rows[r]) out.push({rid:g.rows[r].rid, col:g.columns[c]});
-  return out;
-}
-
-const gridEl = $("#grid");
-gridEl.addEventListener("mousedown", e=>{
-  if(editing || e.button!==0) return;
-  const td = e.target.closest("td");
-  if(!td) return;
-  const tr = td.closest("tr");
-  if(td.classList.contains("rownum")){
-    const rid = +tr.dataset.rid;
-    if(e.ctrlKey && sel.mode==="rows"){ sel.rows.has(rid)?sel.rows.delete(rid):sel.rows.add(rid); }
-    else if(e.shiftKey && sel.mode==="rows" && sel.lastRow!==null){
-      const rows = [...gridEl.querySelectorAll("tbody tr")];
-      const a = rows.findIndex(r=>+r.dataset.rid===sel.lastRow);
-      const b = rows.findIndex(r=>+r.dataset.rid===rid);
-      for(let i=Math.min(a,b);i<=Math.max(a,b);i++) sel.rows.add(+rows[i].dataset.rid);
-    }else{ sel.mode="rows"; sel.rows = new Set([rid]); }
-    sel.mode="rows"; sel.lastRow = rid; applySelection();
-  }else if(td.dataset.c!==undefined){
-    sel.mode="cells"; dragging = true;
-    sel.r1 = sel.r2 = +tr.dataset.r; sel.c1 = sel.c2 = +td.dataset.c;
-    applySelection();
-  }
-});
-gridEl.addEventListener("mouseover", e=>{
-  if(!dragging) return;
-  const td = e.target.closest("td[data-c]");
-  if(!td) return;
-  sel.r2 = +td.closest("tr").dataset.r; sel.c2 = +td.dataset.c;
-  applySelection();
-});
-window.addEventListener("mouseup", ()=>{ dragging = false; });
-
-/* double-click to edit a cell */
-gridEl.addEventListener("dblclick", e=>{
-  const td = e.target.closest("td[data-c]");
-  if(td) editCellInline(td);
-});
+let editing = false;
 function editCellInline(td){
   if(editing) return; editing = true;
-  const tr = td.closest("tr");
-  const rid = +tr.dataset.rid, col = state.grid.columns[+td.dataset.c];
+  const rid = +td.closest("tr").dataset.rid;
+  const col = state.grid.columns[+td.dataset.c];
   const old = td.textContent;
-  td.innerHTML = `<input type="text" value="${esc(old)}" aria-label="Edit ${esc(col)} row ${rid+1}">`;
+  td.innerHTML = `<input type="text" value="${esc(old)}" aria-label="Edit ${esc(col)}">`;
   const inp = td.querySelector("input"); inp.focus(); inp.select();
-  const done = async (commit)=>{
+  const done = async commit=>{
     if(!editing) return; editing = false;
-    const v = inp.value;
-    td.textContent = old;
-    if(commit && v!==old) await manualEdit({op:"cell", rid, col, value:v},
-      `edited ${col} — Ctrl+Z to undo`);
+    const v = inp.value; td.textContent = old;
+    if(commit && v!==old){
+      try{
+        const d = await (await api("/api/edit",{method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({op:"cell", rid, col, value:v})})).json();
+        state.grid = d.grid; state.appliedAny = true;
+        renderBuffer(); loadTimeline();
+        $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+        toast(`edited ${col} — Ctrl+Z to undo`);
+      }catch(e){ toast("Edit failed: "+e.message); }
+    }
   };
   inp.addEventListener("keydown", e=>{
     if(e.key==="Enter") done(true);
@@ -507,185 +580,67 @@ function editCellInline(td){
   });
   inp.addEventListener("blur", ()=>done(true));
 }
-function renameColInline(th){
-  if(editing) return; editing = true;
-  const col = th.dataset.col, old = col;
-  th.innerHTML = `<input type="text" value="${esc(old)}" aria-label="Rename column ${esc(old)}">`;
-  const inp = th.querySelector("input"); inp.focus(); inp.select();
-  const done = async (commit)=>{
-    if(!editing) return; editing = false;
-    const v = inp.value.trim();
-    if(commit && v && v!==old)
-      await manualEdit({op:"rename_col", col:old, new:v}, `renamed to ${v} — Ctrl+Z to undo`);
-    else renderGrid();
-  };
-  inp.addEventListener("keydown", e=>{
-    if(e.key==="Enter") done(true);
-    else if(e.key==="Escape") done(false);
-    e.stopPropagation();
-  });
-  inp.addEventListener("blur", ()=>done(true));
-  inp.addEventListener("click", e=>e.stopPropagation());
-}
 
-async function manualEdit(body, msg){
-  try{
-    const d = await (await api("/api/edit",{method:"POST",
-      headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})).json();
-    state.grid = d.grid; clearSel(); renderGrid();
-    $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
-    ["#btn-report","#dl"].forEach(s=>$(s).classList.remove("hidden"));
-    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
-    toast(msg);
-  }catch(e){ toast("Edit failed: "+e.message); }
-}
-
-async function doUndo(){
-  try{
-    const d = await (await api("/api/undo",{method:"POST"})).json();
-    state.grid = d.grid; clearSel(); renderGrid();
-    $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
-    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
-    toast(d.undo_depth ? `undone (${d.undo_depth} more)` : "undone — history empty");
-  }catch(err){ toast(err.message); }
-}
-$("#btn-undo").addEventListener("click", doUndo);
-
-/* keyboard: Delete clears/removes selection, Ctrl+Z undoes */
-document.addEventListener("keydown", async e=>{
-  if(editing || e.target.matches("input,textarea,select")) return;
-  if(e.key==="Delete" || e.key==="Backspace"){
-    if(sel.mode==="rows" && sel.rows.size){
-      e.preventDefault();
-      manualEdit({op:"delete_rows", rids:[...sel.rows]},
-        `deleted ${sel.rows.size} row(s) — Ctrl+Z to undo`);
-    }else if(sel.mode==="cells"){
-      e.preventDefault();
-      const cells = selectedCells();
-      manualEdit({op:"clear_cells", cells},
-        `cleared ${cells.length} cell(s) — Ctrl+Z to undo`);
-    }
-  }else if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z"){
-    e.preventDefault(); doUndo();
-  }else if(e.key==="Escape"){ clearSel(); }
-});
-
-/* ---------- sidebar open/close ---------- */
-function setDrawer(open){
-  $("#drawer").classList.toggle("open", open);
-  const btn = $("#drawer-toggle");
-  btn.innerHTML = open ? "&lsaquo;" : "&rsaquo;";
-  btn.setAttribute("aria-expanded", String(open));
-}
-function openDrawer(){ setDrawer(true); }
-function closeDrawer(){ setDrawer(false); }
-$("#drawer-toggle").addEventListener("click",
-  ()=>setDrawer(!$("#drawer").classList.contains("open")));
-
-/* ---------- installed models dropdown ---------- */
-(async ()=>{
-  try{
-    const d = await (await fetch("/api/models")).json();
-    if(d.models.length){
-      const sel = $("#model");
-      sel.innerHTML = d.models.map(m=>
-        `<option value="${esc(m)}"${m==="qwen3.5:4b"?" selected":""}>${esc(m)}</option>`).join("");
-    }
-  }catch(e){ /* keep default option */ }
-})();
-
-function openColumn(col){
-  state.selectedCol = col; state.suggestions = [];
-  renderGrid(); renderDrawer(); openDrawer();
-}
-$("#btn-clean-all").addEventListener("click", ()=>{
-  state.selectedCol = null; state.suggestions = [];
-  renderGrid(); renderDrawer(true); openDrawer();
-});
-
-function renderDrawer(wholeTable=false){
-  const col = state.selectedCol;
-  $("#drawer-title").textContent = wholeTable||!col ? "whole table" : col;
-  const body = $("#drawer-body");
-  const issues = col ? state.issues.filter(i=>i.col===col) : state.issues;
-  let html = col ? `<div class="panel-label">column stats</div><div id="colstats"
-      style="display:flex;flex-direction:column;gap:.45rem"></div>` : "";
-  html += `<div class="panel-label">detected issues</div>`;
-  html += issues.length
-    ? issues.map(i=>`<div class="issue-line"><span>${esc(i.issue)}${!col&&i.col?` <span class="mono" style="color:var(--accent-2)">${esc(i.col)}</span>`:""}</span><span class="n">${esc(String(i.count))}</span></div>`).join("")
-    : `<div class="issue-line"><span>nothing suspicious found</span><span class="n">0</span></div>`;
-
-  html += `
-    <div class="panel-label">ask the ai</div>
-    <textarea id="instruction" placeholder="${col
-      ? `e.g. normalize these to ISO dates… / standardize the casing… (optional — leave empty to let YODA decide for '${esc(col)}')`
-      : "e.g. clean everything but don't touch the email column (optional)"}"
-      aria-label="Instruction for the AI"></textarea>
-    <div style="display:flex;gap:.6rem">
-      <button class="primary" id="btn-suggest" style="flex:1">Suggest fixes</button>
-    </div>
-    <div class="notebox">The model receives only redacted statistics + your instruction —
-      never your data.</div>
-    <div id="think" class="hidden thinking"><span class="spinner"></span>
-      <span id="think-word" class="grow"></span>
-      <button class="ghost" id="btn-cancel"
-              style="min-height:30px;padding:.15rem .7rem;font-size:.75rem">Cancel</button></div>
-    <div id="sugg-error"></div>
-    <div id="sugg-box"></div>
-    <div id="verdict-box"></div>`;
-  body.innerHTML = html;
-  $("#btn-suggest").addEventListener("click", ()=>suggest(col));
-  $("#instruction").addEventListener("keydown", e=>{
-    if((e.ctrlKey||e.metaKey) && e.key==="Enter"){ e.preventDefault(); suggest(col); }
-  });
-  if(col) loadColStats(col);
-  renderVerdicts();
+/* ---------- entropy map: issue density per column ---------- */
+function renderEntropy(){
+  const box = $("#entropy");
+  if(!state.grid){ box.innerHTML=""; return; }
+  const perCol = {};
+  state.issues.forEach(i=>{ if(i.col) perCol[i.col] = (perCol[i.col]||0)+1; });
+  box.innerHTML = state.grid.columns.map(c=>{
+    const n = perCol[c]||0;
+    const color = n===0 ? "var(--accent-dim)" : n===1 ? "var(--warn-dim)" : "var(--warn)";
+    const solid = n===0 ? "rgba(60,221,199,.45)" : color;
+    return `<i style="background:${solid}" title="${esc(c)}: ${n} issue(s)"></i>`;
+  }).join("");
 }
 
 /* ---------- column stats ---------- */
 async function loadColStats(col){
   try{
     const d = await (await api("/api/colstats?col="+encodeURIComponent(col))).json();
-    const box = $("#colstats"); if(!box) return;
-    let html = `<div class="stat-chips">
-      <span>${esc(d.dtype)}</span><span>${d.n} rows</span>
-      <span>${d.unique} unique</span>
-      <span style="${d.nulls?'color:var(--warn)':''}">${d.nulls} nulls</span>`;
-    if(d.numeric) html += `<span>min ${d.numeric.min}</span>
-      <span>mean ${d.numeric.mean}</span><span>max ${d.numeric.max}</span>`;
+    let html = `<div class="micro" style="color:var(--accent-2);margin-bottom:.4rem">${esc(col)}</div>
+      <div class="stat-tiles">
+      <span><b>dtype</b>${esc(d.dtype)}</span><span><b>rows</b>${d.n}</span>
+      <span><b>unique</b>${d.unique}</span>
+      <span><b>nulls</b><span style="${d.nulls?'color:var(--warn)':''}">${d.nulls}</span></span>`;
+    if(d.numeric) html += `<span><b>min</b>${d.numeric.min}</span>
+      <span><b>mean</b>${d.numeric.mean}</span><span><b>max</b>${d.numeric.max}</span>`;
     html += `</div>`;
     const bars = d.histogram || d.top_values;
     if(bars && bars.length){
       const max = Math.max(...bars.map(b=>b.n));
-      html += bars.map(b=>`<div class="bar-row">
+      html += `<div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.5rem">` +
+        bars.map(b=>`<div class="bar-row">
         <span class="lbl" title="${esc(b.label??b.value)}">${esc(b.label??b.value)}</span>
         <span class="track"><span class="fill" style="width:${Math.max(2,100*b.n/max)}%"></span></span>
-        <span class="n">${b.n}</span></div>`).join("");
+        <span class="n">${b.n}</span></div>`).join("") + "</div>";
     }
-    box.innerHTML = html;
-  }catch(e){ /* stats are decorative — stay quiet */ }
+    $("#colstats").innerHTML = html;
+  }catch(e){}
 }
 
-/* ---------- suggest (with action words) ---------- */
-const ACTIONS = [
-  "reading column statistics…", "scanning format signatures…",
-  "consulting the local model…", "weighing tool options…",
-  "drafting repair steps…", "validating JSON against schema…",
-  "double-checking column names…"
-];
-let actionTimer = null;
+/* ---------- suggest (action words + cancel) ---------- */
+const ACTIONS = ["reading column statistics…","scanning format signatures…",
+  "consulting the local model…","weighing tool options…","drafting repair steps…",
+  "validating JSON against schema…","double-checking column names…"];
+let actionTimer = null, suggestAbort = null;
 function startThinking(){
-  const box = $("#think"), word = $("#think-word");
-  box.classList.remove("hidden");
-  let i = 0; word.textContent = ACTIONS[0];
-  actionTimer = setInterval(()=>{ i=(i+1)%ACTIONS.length; word.textContent=ACTIONS[i]; }, 1800);
+  $("#think").classList.remove("hidden");
+  let i = 0; $("#think-word").textContent = ACTIONS[0];
+  actionTimer = setInterval(()=>{i=(i+1)%ACTIONS.length;
+    $("#think-word").textContent = ACTIONS[i];}, 1800);
 }
-function stopThinking(){ clearInterval(actionTimer); $("#think")?.classList.add("hidden"); }
+function stopThinking(){ clearInterval(actionTimer); $("#think").classList.add("hidden"); }
 
-let suggestAbort = null;
-async function suggest(col){
-  if(state.busy) return; state.busy = true;
+$("#btn-suggest").addEventListener("click", suggest);
+$("#instruction").addEventListener("keydown", e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==="Enter"){ e.preventDefault(); suggest(); }});
+
+async function suggest(){
+  if(state.busy || !state.grid) return; state.busy = true;
   $("#sugg-error").innerHTML = ""; $("#sugg-box").innerHTML = "";
+  $("#solutions").classList.add("hidden");
   $("#btn-suggest").disabled = true; startThinking();
   suggestAbort = new AbortController();
   $("#btn-cancel").onclick = ()=>suggestAbort.abort();
@@ -693,7 +648,7 @@ async function suggest(col){
     const d = await (await api("/api/plan",{method:"POST",
       headers:{"Content-Type":"application/json"},
       signal: suggestAbort.signal,
-      body:JSON.stringify({model:$("#model").value, col,
+      body:JSON.stringify({model:$("#model").value, col:state.selectedCol,
                            instruction:$("#instruction").value.trim()})})).json();
     state.suggestions = d.steps;
     const src = d.outcome.source==="fallback_rule_based"
@@ -710,50 +665,47 @@ async function suggest(col){
 
 function renderSuggestions(src){
   const box = $("#sugg-box");
+  $("#solutions").classList.remove("hidden");
   if(!state.suggestions.length){
-    box.innerHTML = `<div class="issue-line"><span>the AI proposes no changes here</span><span class="n">0</span></div>`;
+    box.innerHTML = `<div class="notebox">the agent proposes no changes here</div>`;
     return;
   }
-  let html = `<div class="panel-label">suggested fixes <span class="mono" style="color:var(--text-muted);letter-spacing:0">${esc(src)}</span></div>`;
+  let html = `<div class="micro">${esc(src)}</div>`;
   state.suggestions.forEach((s,i)=>{
     const params = Object.keys(s.params||{}).length ? JSON.stringify(s.params) : "";
     html += `
       <div class="suggestion on" data-i="${i}" tabindex="0" role="checkbox"
            aria-checked="true" aria-label="Approve: ${esc(s.tool)} on ${esc(s.col??'whole table')}">
-        <div>
+        <span class="tick" aria-hidden="true">&#10003;</span>
+        <div class="grow">
           <div><span class="tool">${esc(s.tool)}</span>
-               <span class="on-col">(${esc(s.col??"whole table")})</span></div>
-          ${params?`<div class="mono" style="font-size:.72rem;color:var(--warn)">${esc(params)}</div>`:""}
+               <span class="on-col">(${esc(s.col??"whole table")})</span>
+               ${params?`<span class="micro" style="color:var(--warn)">${esc(params)}</span>`:""}</div>
           <div class="why">${esc(s.reason||"")}</div>
         </div>
-        <span class="tick" aria-hidden="true">&#10003;</span>
       </div>`;
   });
-  html += `<button class="primary" id="btn-approve">Approve &amp; apply</button>
-           <div class="notebox">Only selected cards run. Changed cells turn
-           <span style="color:var(--ok)">green</span> in the grid.</div>`;
+  html += `<button class="primary" id="btn-approve">Approve &amp; execute</button>
+    <div class="notebox">only selected cards run — deterministic pandas executes;
+    the model never touches your rows</div>`;
   box.innerHTML = html;
   box.querySelectorAll(".suggestion").forEach(card=>{
-    const flip = ()=>{
-      card.classList.toggle("on");
-      card.setAttribute("aria-checked", card.classList.contains("on"));
-    };
+    const flip = ()=>{card.classList.toggle("on");
+      card.setAttribute("aria-checked", card.classList.contains("on"));};
     card.addEventListener("click", flip);
     card.addEventListener("keydown", e=>{
-      if(e.key===" "||e.key==="Enter"){ e.preventDefault(); flip(); }
-    });
+      if(e.key===" "||e.key==="Enter"){e.preventDefault();flip();}});
   });
   $("#btn-approve").addEventListener("click", applyApproved);
 }
 
-/* ---------- execute ---------- */
 async function applyApproved(){
   if(state.busy) return;
   const steps = [...document.querySelectorAll("#sugg-box .suggestion.on")]
     .map(el=>state.suggestions[+el.dataset.i]);
-  if(!steps.length){ toast("No steps ticked."); return; }
+  if(!steps.length){ toast("No steps selected."); return; }
   state.busy = true;
-  const btn = $("#btn-approve"); btn.disabled = true; btn.textContent = "Applying…";
+  const btn = $("#btn-approve"); btn.disabled = true; btn.textContent = "Executing…";
   try{
     const d = await (await api("/api/execute",{method:"POST",
       headers:{"Content-Type":"application/json"},
@@ -764,233 +716,77 @@ async function applyApproved(){
 }
 
 function handleExecuted(d, nSteps){
-    state.grid = d.grid; state.rounds = d.round;
-    state.verdicts = d.verdicts; state.followup = d.followup;
-    // refresh issue badges from surviving verdicts
-    state.issues = state.issues.filter(i=>{
-      const v = d.verdicts.find(v=>v.col===i.col || (!v.col && !i.col));
-      return !(v && ["resolved","flagged"].includes(v.verdict));
-    });
-    renderGrid();
-    const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
-    const removed = d.grid.removed_rids.length;
-    $("#status-text").textContent =
-      `round ${d.round} — ${changed} cells changed, ${removed} duplicate rows removed, `+
-      `${d.n_rows_after} rows remain`;
-    $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows_after+"×");
-    ["#btn-report","#dl","#dlx","#btn-recipe"].forEach(s=>$(s).classList.remove("hidden"));
-    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
-    toast(`Applied ${nSteps} step(s) — ${changed} cells changed`);
-    state.suggestions = d.followup || [];
-    const box = $("#sugg-box");
-    if(box){
-      if(state.suggestions.length) renderSuggestions("verifier follow-up — issues survived");
-      else box.innerHTML = "";
-    }
-    renderVerdicts();
+  state.grid = d.grid; state.verdicts = d.verdicts; state.appliedAny = true;
+  const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
+  const removed = d.grid.removed_rids.length;
+  $("#filechip").textContent = $("#filechip").textContent
+      .replace(/\(\d+ rows\)/, `(${d.n_rows_after} rows)`);
+  $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+  $("#status-text").textContent =
+    `round ${d.round} — ${changed} cells changed, ${removed} duplicate rows removed, `+
+    `${d.n_rows_after} rows remain`;
+  toast(`Applied ${nSteps} step(s) — ${changed} cells changed`);
+  // refresh issue cards from verdicts that resolved
+  state.issues = state.issues.filter(i=>{
+    const v = d.verdicts.find(v=>v.col===i.col || (!v.col && !i.col));
+    return !(v && ["resolved","flagged"].includes(v.verdict));
+  });
+  renderIssueCards(); renderBuffer(); renderEntropy(); loadTimeline();
+  renderVerdicts();
+  state.suggestions = d.followup || [];
+  if(state.suggestions.length)
+    renderSuggestions("verifier follow-up — issues survived round "+d.round);
+  else $("#sugg-box").innerHTML =
+    `<div class="notebox">nothing left for the agent — see verification below</div>`;
 }
 
 function renderVerdicts(){
-  const box = $("#verdict-box"); if(!box) return;
-  if(!state.verdicts.length){ box.innerHTML=""; return; }
-  const col = state.selectedCol;
-  const list = col ? state.verdicts.filter(v=>v.col===col) : state.verdicts;
-  if(!list.length){ box.innerHTML=""; return; }
+  if(!state.verdicts.length){ $("#verify-box").classList.add("hidden"); return; }
+  $("#verify-box").classList.remove("hidden");
   const order = {unresolved:0,new_issue:0,partially_resolved:1,flagged:2,resolved:3};
-  box.innerHTML = `<div class="panel-label">verification</div>` +
-    [...list].sort((a,b)=>(order[a.verdict]??9)-(order[b.verdict]??9)).map(v=>
-      `<div class="verdict"><span>${esc(v.issue)}${!col&&v.col?` <span class="mono" style="color:var(--accent-2)">${esc(v.col)}</span>`:""}</span>
-       <span class="v-${v.verdict} mono">${esc(v.verdict.replaceAll("_"," "))} ${esc(String(v.before))}&rarr;${esc(String(v.after))}</span></div>`).join("");
+  $("#verdicts").innerHTML = [...state.verdicts]
+    .sort((a,b)=>(order[a.verdict]??9)-(order[b.verdict]??9)).map(v=>
+    `<div class="verdict"><span>${esc(v.issue)}
+       <span style="color:var(--accent-2)">${esc(v.col??"whole table")}</span></span>
+     <span class="v-${v.verdict}">${esc(v.verdict.replaceAll("_"," "))}
+       ${esc(String(v.before))}&rarr;${esc(String(v.after))}</span></div>`).join("");
 }
 
-/* ---------- right-click context menu ---------- */
-const QUICK_TOOLS = [
-  {tool:"trim_whitespace",     label:"Trim whitespace",        params:{}},
-  {tool:"normalize_dates",     label:"Normalize dates to ISO", params:{}},
-  {tool:"normalize_phone",     label:"Normalize PH phones",    params:{}},
-  {tool:"normalize_currency",  label:"Parse currency values",  params:{}},
-  {tool:"standardize_categories",label:"Standardize categories",params:{}},
-  {tool:"fix_dtypes",          label:"Convert to numbers",     params:{target:"numeric"}},
-  {tool:"impute_missing",      label:"Flag missing values",    params:{strategy:"flag_only"}},
-  {tool:"flag_outliers",       label:"Flag outliers (IQR)",    params:{method:"iqr"}},
-];
-const TABLE_TOOLS = [
-  {tool:"drop_duplicates", label:"Drop duplicate rows",        params:{}},
-  {tool:"rename_columns",  label:"snake_case column names",    params:{}},
-];
-let ctxEl = null;
-function closeCtx(){ ctxEl?.remove(); ctxEl = null; }
-["click","scroll","resize"].forEach(ev=>window.addEventListener(ev, closeCtx, true));
-document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeCtx(); });
-
-function quickAction(col, spec){
-  state.selectedCol = col; renderGrid(); renderDrawer(!col); openDrawer();
-  state.suggestions = [{tool:spec.tool, col:col,
-    params:spec.params, reason:"quick action — you chose this from the right-click menu"}];
-  renderSuggestions("manual quick action");
-}
-
-function showCtx(x, y, col){
-  closeCtx();
-  ctxEl = document.createElement("div");
-  ctxEl.className = "ctx"; ctxEl.setAttribute("role","menu");
-  let html = `<div class="head">${col ? esc(col) : "whole table"}</div>`;
-  if(col){
-    html += `<button class="item" data-act="ask">Ask the AI about this column&hellip;</button>
-             <button class="item" data-act="suggest">Suggest fixes (AI)</button><hr>`;
-    QUICK_TOOLS.forEach((t,i)=>{
-      html += `<button class="item" data-quick="${i}">${t.label}
-               <span class="mono-tag">${t.tool}</span></button>`;
-    });
-    html += `<hr><button class="item" data-act="rename">Rename column&hellip;</button>
-             <button class="item" data-act="delcol">Delete column</button>
-             <button class="item" data-act="copy">Copy column name</button>`;
-  }else{
-    html += `<button class="item" data-act="cleanall">Clean everything (AI)&hellip;</button><hr>`;
-    TABLE_TOOLS.forEach((t,i)=>{
-      html += `<button class="item" data-table="${i}">${t.label}
-               <span class="mono-tag">${t.tool}</span></button>`;
-    });
-  }
-  if(sel.mode==="rows" && sel.rows.size)
-    html += `<hr><button class="item" data-act="delrows">Delete ${sel.rows.size} selected row(s)</button>`;
-  if(sel.mode==="cells")
-    html += `<hr><button class="item" data-act="clearcells">Clear selected cell(s)</button>`;
-  ctxEl.innerHTML = html;
-  document.body.appendChild(ctxEl);
-  const r = ctxEl.getBoundingClientRect();
-  ctxEl.style.left = Math.min(x, innerWidth - r.width - 8) + "px";
-  ctxEl.style.top  = Math.min(y, innerHeight - r.height - 8) + "px";
-
-  ctxEl.querySelectorAll(".item").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const {act, quick, table} = btn.dataset;
-      closeCtx();
-      if(act==="ask"){ openColumn(col); setTimeout(()=>$("#instruction")?.focus(), 50); }
-      else if(act==="suggest"){ openColumn(col); suggest(col); }
-      else if(act==="cleanall"){ $("#btn-clean-all").click(); }
-      else if(act==="copy"){ navigator.clipboard?.writeText(col); toast("Copied: "+col); }
-      else if(act==="rename"){
-        const th = $(`#grid thead th[data-col="${CSS.escape(col)}"]`);
-        if(th) renameColInline(th);
-      }
-      else if(act==="delcol"){
-        manualEdit({op:"delete_col", col}, `deleted column ${col} — Ctrl+Z to undo`);
-      }
-      else if(act==="delrows"){
-        manualEdit({op:"delete_rows", rids:[...sel.rows]},
-          `deleted ${sel.rows.size} row(s) — Ctrl+Z to undo`);
-      }
-      else if(act==="clearcells"){
-        const cells = selectedCells();
-        manualEdit({op:"clear_cells", cells}, `cleared ${cells.length} cell(s) — Ctrl+Z to undo`);
-      }
-      else if(quick!==undefined){ quickAction(col, QUICK_TOOLS[+quick]); }
-      else if(table!==undefined){ quickAction(null, TABLE_TOOLS[+table]); }
-    });
-  });
-}
-
-$("#gridwrap").addEventListener("contextmenu", e=>{
-  if(!state.grid) return;             // no file yet — keep native menu
-  const cell = e.target.closest("th[data-col], td");
-  if(!cell) return;
-  e.preventDefault();
-  let col = cell.dataset?.col;
-  if(!col && cell.tagName==="TD" && !cell.classList.contains("rownum")){
-    col = state.grid.columns[cell.cellIndex - 1];  // -1: row-number column
-  }
-  showCtx(e.clientX, e.clientY, col || null);
-});
-
-/* ---------- recipes ---------- */
-$("#btn-recipe").addEventListener("click", e=>{
-  const r = e.target.getBoundingClientRect();
-  closeCtx();
-  ctxEl = document.createElement("div");
-  ctxEl.className = "ctx"; ctxEl.setAttribute("role","menu");
-  ctxEl.innerHTML = `<div class="head">recipes — teach once, replay forever</div>
-    <button class="item" data-r="save">Save applied steps as recipe (.json)</button>
-    <button class="item" data-r="apply">Apply a recipe to this file&hellip;</button>`;
-  document.body.appendChild(ctxEl);
-  ctxEl.style.left = Math.min(r.left, innerWidth-ctxEl.offsetWidth-8)+"px";
-  ctxEl.style.top = (r.bottom+6)+"px";
-  ctxEl.querySelector("[data-r=save]").addEventListener("click", saveRecipe);
-  ctxEl.querySelector("[data-r=apply]").addEventListener("click",
-    ()=>{ closeCtx(); $("#recipe-file").click(); });
-  e.stopPropagation();
-});
-async function saveRecipe(){
-  closeCtx();
-  try{
-    const d = await (await api("/api/recipe")).json();
-    const blob = new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = ($("#filechip").textContent.split(" ")[0]||"data").replace(/\.\w+$/,"") + "_recipe.json";
-    a.click(); URL.revokeObjectURL(a.href);
-    toast(`recipe saved (${d.steps.length} steps) — replay via CLI or 'Apply a recipe'`);
-  }catch(e){ toast(e.message); }
-}
-$("#recipe-file").addEventListener("change", async ()=>{
-  const f = $("#recipe-file").files[0];
-  $("#recipe-file").value = "";
-  if(!f) return;
-  try{
-    const data = JSON.parse(await f.text());
-    const steps = Array.isArray(data) ? data : data.steps;
-    if(!steps?.length) throw new Error("no steps in this recipe");
-    const d = await (await api("/api/execute",{method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({steps})})).json();
-    handleExecuted(d, steps.length);
-  }catch(e){ toast("Recipe failed: "+e.message); }
-});
-
-/* ---------- history & versions ---------- */
-const KIND_COLOR = {upload:"var(--accent-2)", ai:"var(--accent)",
-                    manual:"var(--warn)", revert:"var(--text-muted)"};
-function histRow(inner){ return `<div class="issue-line" style="align-items:center">${inner}</div>`; }
-
-async function openHistory(){
+/* ---------- timeline + versions ---------- */
+async function loadTimeline(){
   try{
     const h = await (await api("/api/history")).json();
-    const tl = $("#timeline-box");
-    tl.innerHTML = [...h.timeline].reverse().map((e,idx)=>{
-      const current = idx===0;
-      return histRow(
-        `<span><span class="mono" style="color:${KIND_COLOR[e.kind]||"var(--text)"}">${esc(e.kind)}</span>
-          ${esc(e.label)} <span class="mono" style="color:var(--text-muted);font-size:.7rem">${e.n_rows} rows · ${esc(e.ts.slice(11))}</span></span>
-         ${current ? `<span class="mono" style="color:var(--ok)">current</span>`
-                   : `<button class="ghost" data-revert="${e.id}"
-                        style="min-height:30px;padding:.15rem .7rem;font-size:.75rem">
-                        ${e.id===0?"Revert to original":"Revert"}</button>`}`);
-    }).join("");
-    tl.querySelectorAll("[data-revert]").forEach(b=>
+    $("#timeline").innerHTML = [...h.timeline].reverse().map((e,idx)=>`
+      <div class="tl-item k-${esc(e.kind)}">
+        <span class="dot" aria-hidden="true"></span>
+        <div class="grow"><div class="lbl">${esc(e.label)}</div>
+          <div class="when">${esc(e.ts.slice(11,16))} · ${e.n_rows} rows</div></div>
+        ${idx===0 ? `<span class="micro" style="color:var(--ok)">now</span>`
+          : `<button class="ghost small" data-revert="${e.id}">
+             ${e.id===0?"origin":"revert"}</button>`}
+      </div>`).join("");
+    document.querySelectorAll("[data-revert]").forEach(b=>
       b.addEventListener("click", ()=>revertTo(+b.dataset.revert)));
     renderVersions(h.versions);
-    $("#hist-modal").classList.remove("hidden");
-  }catch(e){ toast(e.message); }
+  }catch(e){}
 }
 function renderVersions(versions){
-  const box = $("#versions-box");
-  box.innerHTML = versions.length ? versions.map(v=>histRow(
-    `<span class="mono" style="color:var(--accent-2)">${esc(v.name)}
-       <span style="color:var(--text-muted);font-size:.7rem">${v.n_rows} rows · ${esc(v.ts.slice(11))}</span></span>
-     <span style="display:flex;gap:.4rem">
-       <a href="/api/download?version=${encodeURIComponent(v.name)}" download>
-         <button class="ghost" style="min-height:30px;padding:.15rem .7rem;font-size:.75rem">Download</button></a>
-       <button class="ghost" data-restore="${esc(v.name)}"
-         style="min-height:30px;padding:.15rem .7rem;font-size:.75rem">Restore</button></span>`)).join("")
-    : histRow(`<span style="color:var(--text-muted)">no versions saved yet</span><span></span>`);
+  const box = $("#versions");
+  box.innerHTML = versions.length ? versions.map(v=>`
+    <div class="ver-row"><span class="nm">${esc(v.name)}</span>
+      <span class="micro">${v.n_rows}r</span><div class="grow"></div>
+      <a href="/api/download?version=${encodeURIComponent(v.name)}" download>
+        <button class="ghost small">dl</button></a>
+      <button class="ghost small" data-restore="${esc(v.name)}">restore</button>
+    </div>`).join("")
+    : `<div class="notebox">none yet</div>`;
   box.querySelectorAll("[data-restore]").forEach(b=>
     b.addEventListener("click", async ()=>{
       try{
         const d = await (await api("/api/version/restore",{method:"POST",
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({name:b.dataset.restore})})).json();
-        afterStateChange(d, `restored version '${b.dataset.restore}'`);
-        $("#hist-modal").classList.add("hidden");
+        afterStateChange(d, `restored '${b.dataset.restore}'`);
       }catch(e){ toast(e.message); }
     }));
 }
@@ -999,50 +795,101 @@ async function revertTo(id){
     const d = await (await api("/api/revert",{method:"POST",
       headers:{"Content-Type":"application/json"}, body:JSON.stringify({id})})).json();
     afterStateChange(d, id===0 ? "reverted to the original file" : "reverted");
-    $("#hist-modal").classList.add("hidden");
   }catch(e){ toast(e.message); }
 }
 function afterStateChange(d, msg){
-  state.grid = d.grid; clearSel(); renderGrid();
-  $("#filechip").textContent = $("#filechip").textContent.replace(/\d+×/, d.n_rows+"×");
+  state.grid = d.grid; state.appliedAny = true;
+  $("#filechip").textContent = $("#filechip").textContent
+      .replace(/\(\d+ rows\)/, `(${d.n_rows} rows)`);
   $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
-  ["#btn-report","#dl","#dlx"].forEach(s=>$(s).classList.remove("hidden"));
+  renderBuffer(); renderEntropy(); loadTimeline();
   toast(msg + " — Ctrl+Z to step back");
 }
-$("#btn-history").addEventListener("click", openHistory);
-$("#hist-close").addEventListener("click", ()=>$("#hist-modal").classList.add("hidden"));
-$("#hist-modal").addEventListener("click", e=>{
-  if(e.target.id==="hist-modal") $("#hist-modal").classList.add("hidden"); });
 $("#btn-save-version").addEventListener("click", async ()=>{
   const name = $("#version-name").value.trim();
   if(!name){ toast("Give the version a name first."); return; }
+  if(!state.grid){ toast("Load a file first."); return; }
   try{
     const d = await (await api("/api/version",{method:"POST",
       headers:{"Content-Type":"application/json"}, body:JSON.stringify({name})})).json();
-    $("#version-name").value = "";
-    renderVersions(d.versions);
+    $("#version-name").value = ""; renderVersions(d.versions);
     toast(`version '${name}' saved`);
   }catch(e){ toast(e.message); }
 });
 $("#version-name").addEventListener("keydown", e=>{
   if(e.key==="Enter") $("#btn-save-version").click(); });
 
-/* ---------- report / new ---------- */
+/* ---------- undo ---------- */
+async function doUndo(){
+  try{
+    const d = await (await api("/api/undo",{method:"POST"})).json();
+    state.grid = d.grid;
+    $("#filechip").textContent = $("#filechip").textContent
+        .replace(/\(\d+ rows\)/, `(${d.n_rows} rows)`);
+    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+    renderBuffer(); renderEntropy(); loadTimeline();
+    toast(d.undo_depth ? `undone (${d.undo_depth} more)` : "undone — history empty");
+  }catch(e){ toast(e.message); }
+}
+$("#btn-undo").addEventListener("click", doUndo);
+document.addEventListener("keydown", e=>{
+  if(editing || e.target.matches("input,textarea,select")) return;
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z"){ e.preventDefault(); doUndo(); }
+  if(e.key==="Escape") $("#modal").classList.add("hidden");
+});
+
+/* ---------- recipes ---------- */
+$("#btn-save-recipe").addEventListener("click", async ()=>{
+  try{
+    const d = await (await api("/api/recipe")).json();
+    const blob = new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "yoda_recipe.json";
+    a.click(); URL.revokeObjectURL(a.href);
+    $("#recipe-info").textContent = `saved ${d.steps.length} step(s) — replay with: yoda clean file.csv --recipe yoda_recipe.json`;
+  }catch(e){ toast(e.message); }
+});
+$("#btn-apply-recipe").addEventListener("click", ()=>$("#recipe-file").click());
+$("#recipe-file").addEventListener("change", async ()=>{
+  const f = $("#recipe-file").files[0]; $("#recipe-file").value = "";
+  if(!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    const steps = Array.isArray(data) ? data : data.steps;
+    if(!steps?.length) throw new Error("no steps in this recipe");
+    const d = await (await api("/api/execute",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({steps})})).json();
+    document.querySelector('[data-tab="pipeline"]').click();
+    handleExecuted(d, steps.length);
+  }catch(e){ toast("Recipe failed: "+e.message); }
+});
+
+/* ---------- exports: pii + report ---------- */
+async function loadPII(){
+  try{
+    const d = await (await api("/api/scan")).json();
+    const s = d.summary;
+    $("#pii-status").textContent =
+      `pii: ${s.n_columns_with_pii}/${s.n_columns_scanned} cols · risk ${s.highest_risk}`;
+    $("#pii-box").innerHTML = d.columns.length ? d.columns.map(f=>{
+      const det = Object.entries(f.detected).map(([k,v])=>`${k}×${v}`).join(", ") || "—";
+      const c = {high:"var(--danger)",medium:"var(--warn)",low:"var(--ok)"}[f.risk];
+      return `<div class="verdict"><span>${esc(f.col)}
+        <span class="micro">${esc(det)}</span></span>
+        <span style="color:${c}">${f.risk}</span></div>`;
+    }).join("") : `<div class="notebox">no PII detected</div>`;
+  }catch(e){}
+}
 $("#btn-report").addEventListener("click", async ()=>{
   try{
-    $("#report-pre").textContent = await (await api("/api/report")).text();
-    $("#modal").classList.remove("hidden");
+    const md = await (await api("/api/report")).text();
+    const pre = $("#report-pre"); pre.textContent = md;
+    pre.classList.remove("hidden");
   }catch(e){ toast(e.message); }
 });
 $("#modal-close").addEventListener("click", ()=>$("#modal").classList.add("hidden"));
-$("#modal").addEventListener("click", e=>{ if(e.target.id==="modal") $("#modal").classList.add("hidden"); });
-document.addEventListener("keydown", e=>{
-  if(e.key==="Escape"){
-    $("#modal").classList.add("hidden");
-    $("#hist-modal").classList.add("hidden");
-  }
-});
-$("#btn-new").addEventListener("click", ()=>location.reload());
 </script>
 </body>
 </html>
