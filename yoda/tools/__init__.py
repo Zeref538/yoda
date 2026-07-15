@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
+import numpy as np
 import pandas as pd
 from dateutil import parser as dateparser
 
@@ -92,6 +93,8 @@ def normalize_phone(df: pd.DataFrame, col: str, params: dict | None = None):
 def normalize_currency(df: pd.DataFrame, col: str, params: dict | None = None):
     """'₱1,200.00' / 'PHP 1200' / '1200' -> float, plus a <col>_currency column."""
     out = df.copy()
+    # Categorical .map() operates on categories, not values — flatten first.
+    out[col] = out[col].astype(object)
     n_changed = n_failed = 0
     currencies = []
 
@@ -174,18 +177,27 @@ def impute_missing(df: pd.DataFrame, col: str, params: dict | None = None):
     if strategy == "flag_only":
         out[f"{col}_missing"] = out[col].isna()
         return out, {"rows_affected": n_null, "strategy": strategy}
-    if strategy == "mean":
-        fill = out[col].mean()
-    elif strategy == "median":
-        fill = out[col].median()
+    if strategy in ("mean", "median"):
+        numeric = pd.to_numeric(out[col], errors="coerce").astype(float)
+        numeric = numeric.mask(~np.isfinite(numeric.fillna(0.0)) & numeric.notna())
+        if numeric.notna().sum() == 0:
+            raise ValueError(f"impute '{strategy}' needs a numeric column; "
+                             f"'{col}' has no numeric values")
+        fill = numeric.mean() if strategy == "mean" else numeric.median()
     elif strategy == "mode":
-        fill = out[col].mode().iloc[0] if not out[col].mode().empty else None
+        modes = out[col].mode()
+        if modes.empty:
+            raise ValueError(f"'{col}' has no values to compute a mode from")
+        fill = modes.iloc[0]
     elif strategy == "constant":
         fill = params.get("value")
+        if fill is None:
+            raise ValueError("impute 'constant' needs params.value")
     else:
         raise ValueError(f"unknown impute strategy: {strategy}")
     out[f"{col}_missing"] = out[col].isna()
-    out[col] = out[col].fillna(fill)
+    with pd.option_context("future.no_silent_downcasting", True):
+        out[col] = out[col].fillna(fill).infer_objects(copy=False)
     return out, {"rows_affected": n_null, "strategy": strategy, "fill_value": str(fill)}
 
 
@@ -195,7 +207,8 @@ def flag_outliers(df: pd.DataFrame, col: str, params: dict | None = None):
     params = params or {}
     method = params.get("method", "iqr")
     out = df.copy()
-    s = pd.to_numeric(out[col], errors="coerce")
+    s = pd.to_numeric(out[col], errors="coerce").astype(float)
+    s = s.mask(~np.isfinite(s.fillna(0.0)) & s.notna())  # ±inf -> NaN
     if method == "iqr":
         q1, q3 = s.quantile(0.25), s.quantile(0.75)
         iqr = q3 - q1

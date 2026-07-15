@@ -178,7 +178,11 @@ def clean(
     if recipe:
         from yoda.recipe import load_recipe
         planner_obj = RuleBasedPlanner()  # verifier follow-ups stay deterministic
-        plan = load_recipe(recipe)
+        try:
+            plan = load_recipe(recipe)
+        except (FileNotFoundError, ValueError) as exc:
+            console.print(f"[red]Could not load recipe {recipe}: {exc}[/red]")
+            raise typer.Exit(code=1)
         console.print(f"[dim]Step 2/5 Plan loaded from recipe [bold]{recipe}[/bold] "
                       "(previously human-approved).[/dim]\n")
     elif planner == "rule_based":
@@ -283,7 +287,11 @@ def scan(
     from yoda.io import load
     from yoda.scan import scan as _scan, scan_markdown
 
-    df = load(path, table=table)
+    try:
+        df = load(path, table=table)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1)
     result = _scan(df)
     t = Table(title="PII scan (counts only - values never shown)",
               title_style="bold", border_style="dim")
@@ -315,7 +323,13 @@ def validate(
     from yoda.contract import load_contract, validate as _validate
     from yoda.io import load
 
-    result = _validate(load(path, table=table), load_contract(contract))
+    try:
+        contract_data = load_contract(contract)
+        df = load(path, table=table)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1)
+    result = _validate(df, contract_data)
     t = Table(title=f"Contract: {contract}", title_style="bold", border_style="dim")
     for c in ("rule", "column", "violations", "detail", "verdict"):
         t.add_column(c)
@@ -350,11 +364,15 @@ def watch(
     from yoda.recipe import load_recipe
     from yoda.watch import run_watch
 
-    steps = load_recipe(recipe)
-    contract_data = None
-    if contract:
-        from yoda.contract import load_contract
-        contract_data = load_contract(contract)
+    try:
+        steps = load_recipe(recipe)
+        contract_data = None
+        if contract:
+            from yoda.contract import load_contract
+            contract_data = load_contract(contract)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1)
     out_dir = out or str(Path(folder) / "cleaned")
     q_dir = quarantine or str(Path(folder) / "quarantine")
     _banner(f"watch mode - {len(steps)}-step recipe - Ctrl+C to stop")

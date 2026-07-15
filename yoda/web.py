@@ -158,7 +158,8 @@ async def upload(file: UploadFile = File(...)):
     prof = profile(df)
     S.clear()
     S.update(df=df, cleaned=df, prof=prof, name=file.filename, rounds=[],
-             planner=None, new_prof=prof, verdicts=[], versions={})
+             planner=None, new_prof=prof, verdicts=[], versions={},
+             _prof_cache=prof, _prof_for=df)
     _snapshot("original upload", "upload")
     return {
         "name": file.filename, "n_rows": len(df), "n_cols": len(df.columns),
@@ -172,7 +173,7 @@ async def upload(file: UploadFile = File(...)):
 def plan(body: dict):
     if "prof" not in S:
         raise HTTPException(400, "upload a file first")
-    prof = profile(S["cleaned"]) if S["rounds"] else S["prof"]
+    prof = _cleaned_prof() if S["rounds"] else S["prof"]
     col = body.get("col")
     instruction = body.get("instruction") or None
 
@@ -199,7 +200,7 @@ def run(body: dict):
     steps = body.get("steps", [])
     source = S["cleaned"]
     try:
-        validate_plan({"steps": steps}, profile(source))
+        validate_plan({"steps": steps}, _cleaned_prof())
     except Exception as exc:
         raise HTTPException(400, f"invalid plan: {exc}")
 
@@ -208,7 +209,7 @@ def run(body: dict):
     S["cleaned"] = cleaned
     S["rounds"].append({"plan": steps, "audit": audit})
 
-    new_prof = profile(cleaned)
+    new_prof = _cleaned_prof()
     verdicts = diff_profiles(S["prof"], new_prof)
     S["verdicts"], S["new_prof"] = verdicts, new_prof
     followup = ([] if len(S["rounds"]) >= 4 or S["planner"] is None
@@ -238,6 +239,18 @@ def _snapshot(label: str, kind: str):
     cap = 40 if len(S["cleaned"]) <= 50_000 else 10
     if len(tl) > cap:
         del tl[1:len(tl) - cap + 1]
+
+
+def _cleaned_prof() -> dict:
+    """Profile of the current working dataframe, cached until it changes.
+
+    Profiling a large file takes ~1s; /api/plan and /api/execute both need
+    it, so every mutation invalidates instead of recomputing eagerly.
+    """
+    if S.get("_prof_for") is not S.get("cleaned"):
+        S["_prof_cache"] = profile(S["cleaned"])
+        S["_prof_for"] = S["cleaned"]
+    return S["_prof_cache"]
 
 
 def _timeline_meta():
