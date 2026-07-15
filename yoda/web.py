@@ -142,6 +142,8 @@ async def upload(file: UploadFile = File(...)):
             df = dedupe_columns(pd.read_csv(io.BytesIO(raw)))
         elif suffix in (".xlsx", ".xls"):
             df = dedupe_columns(pd.read_excel(io.BytesIO(raw)))
+        elif suffix == ".parquet":
+            df = dedupe_columns(pd.read_parquet(io.BytesIO(raw)))
         elif suffix in (".sqlite", ".db", ".sqlite3"):
             from yoda.io import load
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:

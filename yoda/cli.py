@@ -125,6 +125,8 @@ def clean(
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan and report only; touch nothing"),
     recipe: str = typer.Option(None, help="Replay a saved recipe instead of planning"),
     save_recipe: str = typer.Option(None, help="Save the approved plan as a recipe JSON"),
+    all_tables: bool = typer.Option(False, "--all-tables",
+                                    help="SQLite: clean every table in the database"),
 ) -> None:
     """Profile -> plan (local LLM) -> human approval -> execute -> verify -> report."""
     # Imports here keep `yoda version` fast and dependency-light.
@@ -137,6 +139,24 @@ def clean(
     from yoda.verifier import diff_profiles, follow_up_plan
 
     _banner("100% local - raw rows never reach the model - nothing leaves this machine")
+
+    if all_tables:
+        from yoda.io import list_tables
+        if Path(path).suffix.lower() not in (".sqlite", ".db", ".sqlite3"):
+            console.print("[red]--all-tables only applies to SQLite inputs.[/red]")
+            raise typer.Exit(code=1)
+        tables = list_tables(path)
+        console.print(f"Database has {len(tables)} table(s): {', '.join(tables)}\n")
+        for t in tables:
+            console.print(f"[bold cyan]=== table: {t} ===[/bold cyan]")
+            try:
+                clean(path=path, table=t, model=model, planner=planner, yes=yes,
+                      dry_run=dry_run, recipe=recipe, save_recipe=None,
+                      all_tables=False)
+            except typer.Exit as exc:
+                if exc.exit_code not in (0, None):
+                    console.print(f"[yellow]table {t}: skipped ({exc.exit_code})[/yellow]")
+        raise typer.Exit()
 
     try:
         df = load(path, table=table)
@@ -204,7 +224,8 @@ def clean(
                       f"`yoda clean other.csv --recipe {save_recipe}`.[/dim]")
 
     src_path = Path(path)
-    audit_path = src_path.with_name(src_path.stem + "_audit.jsonl")
+    tag = f"_{table}" if table else ""
+    audit_path = src_path.with_name(src_path.stem + tag + "_audit.jsonl")
     console.print(f"\n[cyan]Step 4/5[/cyan] Executing {len(approved)} step(s) "
                   "(deterministic pandas):")
     cleaned, audit = execute(df, approved, audit_path=audit_path, on_step=_print_step)
@@ -220,7 +241,7 @@ def clean(
                       "proposing a follow-up round.[/yellow]")
         approved2 = approve_plan(followup, console, auto_yes=yes)
         if approved2:
-            audit_path2 = src_path.with_name(src_path.stem + "_audit_round2.jsonl")
+            audit_path2 = src_path.with_name(src_path.stem + tag + "_audit_round2.jsonl")
             console.print("\nExecuting follow-up round:")
             cleaned, audit2 = execute(cleaned, approved2, audit_path=audit_path2,
                                       on_step=_print_step)
@@ -229,7 +250,7 @@ def clean(
             verdicts = diff_profiles(prof, new_prof)
 
     out_path = save(cleaned, path, table=table)
-    report_path = src_path.with_name(src_path.stem + "_report.md")
+    report_path = src_path.with_name(src_path.stem + tag + "_report.md")
     write_report(report_path, source=str(path), before_profile=prof,
                  after_profile=new_prof, rounds=rounds, verdicts=verdicts)
 
@@ -253,11 +274,71 @@ def clean(
 
 
 @app.command()
+def scan(
+    path: str = typer.Argument(..., help="File to scan for PII"),
+    table: str = typer.Option(None, help="Table name (SQLite inputs)"),
+    out: str = typer.Option(None, help="Also write a markdown report here"),
+) -> None:
+    """Report where PII lives (emails, PH phones, names) - touches nothing."""
+    from yoda.io import load
+    from yoda.scan import scan as _scan, scan_markdown
+
+    df = load(path, table=table)
+    result = _scan(df)
+    t = Table(title="PII scan (counts only - values never shown)",
+              title_style="bold", border_style="dim")
+    for c in ("column", "risk", "detected", "cells", "notes"):
+        t.add_column(c)
+    risk_style = {"high": "red", "medium": "yellow", "low": "green"}
+    for f in result["columns"]:
+        det = ", ".join(f"{k} x{v}" for k, v in f["detected"].items()) or "-"
+        notes = "PII-suggestive name" if f["sensitive_name"] else ""
+        t.add_row(f["col"], f"[{risk_style[f['risk']]}]{f['risk']}[/]",
+                  det, str(f["n_cells"]), notes)
+    console.print(t)
+    s = result["summary"]
+    console.print(f"\n{s['n_columns_with_pii']}/{s['n_columns_scanned']} columns "
+                  f"contain PII - highest risk: [bold]{s['highest_risk']}[/bold]")
+    if out:
+        Path(out).write_text(scan_markdown(result, path), encoding="utf-8")
+        console.print(f"Report written to [bold]{out}[/bold]")
+    raise typer.Exit(code=1 if s["highest_risk"] == "high" else 0)
+
+
+@app.command()
+def validate(
+    path: str = typer.Argument(..., help="File to validate"),
+    contract: str = typer.Option(..., help="Contract file (YAML or JSON)"),
+    table: str = typer.Option(None, help="Table name (SQLite inputs)"),
+) -> None:
+    """Check a file against a data contract; exit 1 on any violation."""
+    from yoda.contract import load_contract, validate as _validate
+    from yoda.io import load
+
+    result = _validate(load(path, table=table), load_contract(contract))
+    t = Table(title=f"Contract: {contract}", title_style="bold", border_style="dim")
+    for c in ("rule", "column", "violations", "detail", "verdict"):
+        t.add_column(c)
+    for r in result["results"]:
+        t.add_row(r["rule"], r["col"] or "whole table", str(r["violations"]),
+                  r["detail"],
+                  "[green]pass[/green]" if r["passed"] else "[red]FAIL[/red]")
+    console.print(t)
+    if result["passed"]:
+        console.print("[green]Contract satisfied.[/green]")
+    else:
+        console.print(f"[red]{result['n_violations']} violation(s) across "
+                      f"{sum(not r['passed'] for r in result['results'])} rule(s).[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def watch(
     folder: str = typer.Argument(..., help="Folder to watch for new CSV/XLSX files"),
     recipe: str = typer.Option(..., help="Recipe JSON to apply to every new file"),
     out: str = typer.Option(None, help="Output folder (default <folder>/cleaned)"),
     quarantine: str = typer.Option(None, help="Quarantine folder (default <folder>/quarantine)"),
+    contract: str = typer.Option(None, help="Also enforce a data contract on the cleaned output"),
     interval: float = typer.Option(5.0, help="Poll interval in seconds"),
     once: bool = typer.Option(False, "--once", help="Process current files, then exit"),
 ) -> None:
@@ -270,6 +351,10 @@ def watch(
     from yoda.watch import run_watch
 
     steps = load_recipe(recipe)
+    contract_data = None
+    if contract:
+        from yoda.contract import load_contract
+        contract_data = load_contract(contract)
     out_dir = out or str(Path(folder) / "cleaned")
     q_dir = quarantine or str(Path(folder) / "quarantine")
     _banner(f"watch mode - {len(steps)}-step recipe - Ctrl+C to stop")
@@ -285,7 +370,7 @@ def watch(
 
     try:
         run_watch(folder, steps, out_dir, q_dir, interval=interval,
-                  once=once, on_result=show)
+                  once=once, on_result=show, contract=contract_data)
     except KeyboardInterrupt:
         console.print("\n[dim]watch stopped.[/dim]")
 

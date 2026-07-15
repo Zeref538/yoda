@@ -73,7 +73,26 @@ Available tools (col = column to act on, null for whole-table tools):
 
 Rules: propose a step ONLY when the profile shows evidence for it. Do not invent
 columns. Do not clean what is not dirty — unnecessary changes are penalized.
-Each step needs a short "reason" citing the profile evidence."""
+Each step needs a short "reason" citing the profile evidence.
+
+Tool-choice examples (learn the signal -> tool mapping exactly):
+1. Profile shows: "price": {"currency_like_values": 25, "numeric_as_string": 180}
+   -> {"tool": "normalize_currency", "col": "price", "params": {},
+       "reason": "25 currency-style values (₱/PHP prefixes) present"}
+   currency_like_values ALWAYS wins over fix_dtypes, even when
+   numeric_as_string is larger: fix_dtypes cannot parse '₱1,200.00' and
+   will corrupt the column. Never propose fix_dtypes on a column that has
+   currency_like_values.
+2. Profile shows: "qty": {"numeric_as_string": 40} and NO currency_like_values
+   -> {"tool": "fix_dtypes", "col": "qty", "params": {"target": "numeric"},
+       "reason": "40 plain numeric strings, no currency symbols"}
+3. Profile shows: "n_rows": 130 but duplicates: {"full_row": 10}
+   -> {"tool": "drop_duplicates", "col": null, "params": {},
+       "reason": "10 exact duplicate rows"}
+4. Profile shows: "age": {"iqr_outliers": 12, "null_pct": 4.0}
+   -> TWO steps: flag_outliers(age, {"method": "iqr"}) AND
+      impute_missing(age, {"strategy": "flag_only"}) — outliers and nulls
+      are separate issues; both are flagged, never deleted or filled."""
 
 
 class RuleBasedPlanner:

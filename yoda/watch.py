@@ -19,11 +19,11 @@ from yoda.profiler import profile
 from yoda.report import build_report
 from yoda.verifier import OPEN_VERDICTS, diff_profiles
 
-WATCHABLE = {".csv", ".xlsx", ".xls"}
+WATCHABLE = {".csv", ".xlsx", ".xls", ".parquet"}
 
 
 def process_file(path: Path, steps: list[dict], out_dir: Path,
-                 quarantine_dir: Path) -> dict:
+                 quarantine_dir: Path, contract: dict | None = None) -> dict:
     """Clean one file with a recipe. Returns a summary dict."""
     out_dir.mkdir(parents=True, exist_ok=True)
     df = load(path)
@@ -48,6 +48,17 @@ def process_file(path: Path, steps: list[dict], out_dir: Path,
                            f"{n_open} issue(s) unresolved after cleaning",
                            cleaned=cleaned, report=report)
 
+    if contract is not None:
+        from yoda.contract import validate as validate_contract
+        cres = validate_contract(cleaned, contract)
+        if not cres["passed"]:
+            broken = [f"{r['rule']}({r['col'] or 'table'}): {r['violations']}"
+                      for r in cres["results"] if not r["passed"]]
+            return _quarantine(path, quarantine_dir,
+                               "contract violations after cleaning: "
+                               + "; ".join(broken),
+                               cleaned=cleaned, report=report)
+
     out_csv = out_dir / (path.stem + "_cleaned.csv")
     cleaned.to_csv(out_csv, index=False)
     (out_dir / (path.stem + "_report.md")).write_text(report, encoding="utf-8")
@@ -70,7 +81,8 @@ def _quarantine(path: Path, qdir: Path, reason: str, cleaned=None,
 
 
 def scan_once(folder: Path, steps: list[dict], out_dir: Path,
-              quarantine_dir: Path, seen: set[str]) -> list[dict]:
+              quarantine_dir: Path, seen: set[str],
+              contract: dict | None = None) -> list[dict]:
     """One pass over the folder; processes files not seen before."""
     results = []
     for p in sorted(folder.iterdir()):
@@ -79,7 +91,8 @@ def scan_once(folder: Path, steps: list[dict], out_dir: Path,
             continue
         seen.add(p.name)
         try:
-            results.append(process_file(p, steps, out_dir, quarantine_dir))
+            results.append(process_file(p, steps, out_dir, quarantine_dir,
+                                        contract=contract))
         except Exception as exc:  # a broken file must not kill the watcher
             results.append(_quarantine(p, quarantine_dir,
                                        f"failed to process: {exc}"))
@@ -88,12 +101,14 @@ def scan_once(folder: Path, steps: list[dict], out_dir: Path,
 
 def run_watch(folder: str | Path, steps: list[dict], out_dir: str | Path,
               quarantine_dir: str | Path, interval: float = 5.0,
-              once: bool = False, on_result=print) -> None:
+              once: bool = False, on_result=print,
+              contract: dict | None = None) -> None:
     folder, out_dir = Path(folder), Path(out_dir)
     quarantine_dir = Path(quarantine_dir)
     seen: set[str] = set()
     while True:
-        for r in scan_once(folder, steps, out_dir, quarantine_dir, seen):
+        for r in scan_once(folder, steps, out_dir, quarantine_dir, seen,
+                           contract=contract):
             on_result(r)
         if once:
             return

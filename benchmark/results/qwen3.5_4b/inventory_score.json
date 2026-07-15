@@ -17,10 +17,10 @@
     },
     "duplicate": {
       "n": 14,
-      "detected": 0,
-      "fixed": 0,
-      "detection_rate": 0.0,
-      "fix_rate": 0.0
+      "detected": 14,
+      "fixed": 14,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
     },
     "mixed_date_format": {
       "n": 45,
@@ -53,8 +53,8 @@
   },
   "overall": {
     "n_errors": 284,
-    "detection_rate": 0.9507,
-    "fix_rate": 0.9366,
+    "detection_rate": 1.0,
+    "fix_rate": 0.9859,
     "false_fix_rate": 0.0,
     "n_clean_cells_checked": 2434,
     "n_false_fixes": 0

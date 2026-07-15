@@ -10,9 +10,9 @@
     },
     "dtype_corruption": {
       "n": 30,
-      "detected": 0,
+      "detected": 30,
       "fixed": 21,
-      "detection_rate": 0.0,
+      "detection_rate": 1.0,
       "fix_rate": 0.7
     },
     "duplicate": {
@@ -46,7 +46,7 @@
   },
   "overall": {
     "n_errors": 188,
-    "detection_rate": 0.3617,
+    "detection_rate": 0.5213,
     "fix_rate": 0.4734,
     "false_fix_rate": 0.0,
     "n_clean_cells_checked": 1633,
@@ -54,7 +54,9 @@
   },
   "planner_outcome": {
     "source": "llm",
-    "attempts": 1,
-    "errors": []
+    "attempts": 2,
+    "errors": [
+      "PlanValidationError: step 4: tool 'normalize_currency' requires a column"
+    ]
   }
 }

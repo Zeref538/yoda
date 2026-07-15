@@ -23,6 +23,13 @@ def dedupe_columns(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def list_tables(path: str | Path) -> list[str]:
+    """Table names in a SQLite database."""
+    with sqlite3.connect(Path(path)) as conn:
+        return [r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
+
+
 def load(path: str | Path, table: str | None = None) -> pd.DataFrame:
     p = Path(path)
     suffix = p.suffix.lower()
@@ -30,6 +37,11 @@ def load(path: str | Path, table: str | None = None) -> pd.DataFrame:
         return dedupe_columns(pd.read_csv(p))
     if suffix in (".xlsx", ".xls"):
         return dedupe_columns(pd.read_excel(p))
+    if suffix == ".parquet":
+        try:
+            return dedupe_columns(pd.read_parquet(p))
+        except ImportError:
+            raise ValueError("parquet support needs pyarrow: pip install pyarrow")
     if suffix in (".sqlite", ".db", ".sqlite3"):
         with sqlite3.connect(p) as conn:
             if table is None:
@@ -50,6 +62,8 @@ def save(df: pd.DataFrame, src: str | Path, table: str | None = None) -> Path:
     out = p.with_name(p.stem + "_cleaned" + p.suffix)
     if suffix == ".csv":
         df.to_csv(out, index=False)
+    elif suffix == ".parquet":
+        df.to_parquet(out, index=False)
     elif suffix in (".xlsx", ".xls"):
         out = out.with_suffix(".xlsx")
         df.to_excel(out, index=False)
