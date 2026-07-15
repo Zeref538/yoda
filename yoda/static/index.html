@@ -194,6 +194,43 @@
   .bar-row .fill{background:var(--accent);opacity:.8;height:100%}
   .bar-row .n{color:var(--text-muted);text-align:right}
 
+  /* ---------- data view (top preview) ---------- */
+  .dataview{border:1px solid var(--border);border-radius:var(--r);
+        overflow:auto;max-height:21rem;background:var(--bg)}
+  .dataview table{border-collapse:separate;border-spacing:0;font-size:.7rem;
+        white-space:nowrap;min-width:100%}
+  .dataview th,.dataview td{border-right:1px solid var(--line);
+        border-bottom:1px solid var(--line);padding:.26rem .6rem;max-width:15rem;
+        overflow:hidden;text-overflow:ellipsis}
+  .dataview thead th{position:sticky;top:0;z-index:5;background:var(--surface-2);
+        color:var(--text);font-weight:700;text-align:left;cursor:pointer;
+        text-transform:uppercase;letter-spacing:.08em;font-size:.6rem;
+        border-bottom:1px solid var(--border)}
+  .dataview thead th:hover{color:var(--accent)}
+  .dataview thead th.selected{color:var(--accent);
+        box-shadow:inset 0 -2px 0 var(--accent)}
+  .dataview thead th.newcol{color:var(--accent-2);
+        box-shadow:inset 0 -2px 0 var(--accent-2)}
+  .dataview th .cnt{display:inline-block;min-width:1rem;text-align:center;
+        margin-left:.35rem;font-size:.56rem;border-radius:var(--r);
+        background:var(--warn);color:#221a00;padding:0 .22rem;font-weight:700}
+  .dataview td{color:var(--text-muted)}
+  .dataview td.rownum{position:sticky;left:0;background:var(--surface);
+        color:#4a5560;z-index:4;font-size:.58rem;border-right:1px solid var(--border)}
+  .dataview td.changed{background:var(--ok-dim);color:var(--ok)}
+  .dataview td.newcell{background:var(--accent-2-dim);color:var(--accent-2)}
+  .dataview td input{width:100%;font:inherit;background:var(--bg);
+        color:var(--text);border:1px solid var(--accent);border-radius:var(--r);
+        padding:0 .2rem;text-transform:none;letter-spacing:0}
+  .view-head{display:flex;align-items:center;gap:.5rem}
+  .view-head .rowbtns{display:flex;gap:0}
+  .view-head .rowbtns button{border-radius:0;min-height:26px;
+        padding:.1rem .55rem;font-size:.6rem}
+  .view-head .rowbtns button:first-child{border-radius:var(--r) 0 0 var(--r)}
+  .view-head .rowbtns button:last-child{border-radius:0 var(--r) var(--r) 0}
+  .view-head .rowbtns button.active{background:var(--accent);
+        border-color:var(--accent);color:#04211c;font-weight:700}
+
   /* ---------- dropzone ---------- */
   .empty{height:100%;display:flex;flex-direction:column;align-items:center;
          justify-content:center;gap:1.1rem;padding:2rem}
@@ -298,6 +335,16 @@
       </div>
 
       <div id="pipeline" class="hidden" style="display:flex;flex-direction:column;gap:1.1rem">
+        <div class="view-head">
+          <div class="seclabel" style="flex:1">data view
+            <span id="view-note" style="letter-spacing:.02em;text-transform:none"></span></div>
+          <div class="rowbtns" role="group" aria-label="Preview row count">
+            <button class="active" data-rows="10">10</button>
+            <button data-rows="50">50</button>
+            <button data-rows="0" title="Hide the data view">hide</button>
+          </div>
+        </div>
+        <div class="dataview" id="dataview" aria-label="Data preview"></div>
         <div>
           <div class="paneltitle" style="font-size:1rem">Pipeline Analysis</div>
           <div class="micro" id="analysis-sub"></div>
@@ -502,11 +549,72 @@ function renderIssueCards(){
       $("#scope-note").textContent = iss.col ? `scope: ${iss.col}` : "scope: whole table";
       renderIssueCards();
       if(iss.col) loadColStats(iss.col);
-      highlightBufferCol();
+      highlightBufferCol(); renderDataView();
     };
     c.addEventListener("click", pick);
     c.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
   });
+}
+
+/* ---------- data view (excel-style top preview, 10/50 rows) ---------- */
+let previewN = 10;
+document.querySelectorAll(".rowbtns button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    previewN = +b.dataset.rows;
+    document.querySelectorAll(".rowbtns button").forEach(x=>
+      x.classList.toggle("active", x===b));
+    renderDataView();
+  });
+});
+function issueCount(col){ return state.issues.filter(i=>i.col===col).length; }
+function renderDataView(){
+  const g = state.grid, box = $("#dataview");
+  if(!g) return;
+  if(previewN === 0){
+    box.classList.add("hidden");
+    $("#view-note").textContent = "";
+    return;
+  }
+  box.classList.remove("hidden");
+  const changed = g.changed||{}, newCols = new Set(g.new_cols||[]);
+  let html = "<table><thead><tr><th style='cursor:default'></th>";
+  g.columns.forEach(c=>{
+    const n = issueCount(c);
+    const cls = [c===state.selectedCol?"selected":"", newCols.has(c)?"newcol":""].join(" ");
+    html += `<th class="${cls}" data-col="${esc(c)}" tabindex="0" role="button"
+      aria-label="Column ${esc(c)}${n?`, ${n} issues`:""}">${esc(c)}${
+      n?`<span class="cnt">${n}</span>`:""}</th>`;
+  });
+  html += "</tr></thead><tbody>";
+  g.rows.slice(0, previewN).forEach(r=>{
+    html += `<tr data-rid="${r.rid}"><td class="rownum">${r.rid+1}</td>`;
+    r.cells.forEach((v,ci)=>{
+      const col = g.columns[ci];
+      const isCh = (changed[col]||[]).includes(r.rid);
+      const cls = newCols.has(col) ? "newcell" : isCh ? "changed" : "";
+      const was = isCh ? g.before?.[col]?.[String(r.rid)] : undefined;
+      html += `<td class="${cls}" data-c="${ci}"
+        title="${esc(was!==undefined?`was: ${was||"(empty)"}`:v)}">${esc(v)}</td>`;
+    });
+    html += "</tr>";
+  });
+  html += "</tbody></table>";
+  box.innerHTML = html;
+  $("#view-note").textContent =
+    ` — first ${Math.min(previewN, g.rows.length)} of ${g.n_total_rows} rows`;
+  box.querySelectorAll("th[data-col]").forEach(th=>{
+    const pick = ()=>{
+      state.selectedCol = th.dataset.col;
+      $("#scope-note").textContent = `scope: ${th.dataset.col}`;
+      loadColStats(th.dataset.col); renderIssueCards();
+      renderDataView(); highlightBufferCol();
+    };
+    th.addEventListener("click", pick);
+    th.addEventListener("keydown", e=>{
+      if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
+  });
+  box.querySelectorAll("td[data-c]").forEach(td=>
+    td.addEventListener("dblclick", ()=>editCellInline(td)));
 }
 
 /* ---------- raw buffer (small preview) ---------- */
@@ -545,6 +653,7 @@ function renderBuffer(){
   box.querySelectorAll("td").forEach(td=>{
     td.addEventListener("dblclick", ()=>editCellInline(td));
   });
+  renderDataView();
 }
 function highlightBufferCol(){
   document.querySelectorAll("#buffer th").forEach(th=>
