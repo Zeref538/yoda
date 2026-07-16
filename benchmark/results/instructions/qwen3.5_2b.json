@@ -1,0 +1,968 @@
+[
+ {
+  "case": {
+   "id": "blank_rows_verbatim",
+   "kind": "verbatim",
+   "instruction": "remove blank rows",
+   "expect": [
+    {
+     "tool": "drop_blank_rows"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "drop_blank_rows",
+    "col": null,
+    "params": {},
+    "reason": "Profile shows n_rows=10 and blank_rows=1; removing the single empty row."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "blank_rows_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "get rid of the completely empty lines in this table",
+   "expect": [
+    {
+     "tool": "drop_blank_rows"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "drop_blank_rows",
+    "col": null,
+    "params": {},
+    "reason": "1 blank row detected (n_blanks=1) and 20% missing values in 'name' column indicate incomplete data; removing empty rows is required."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "blank_rows_typo",
+   "kind": "typo",
+   "instruction": "remvoe the blnak rows plz",
+   "expect": [
+    {
+     "tool": "drop_blank_rows"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "drop_blank_rows",
+    "col": null,
+    "params": {},
+    "reason": "Profile shows blank_rows = 1 and a column 'note' with null_pct = 100.0%, indicating the user wants to remove empty rows."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "blank_cols_verbatim",
+   "kind": "verbatim",
+   "instruction": "remove empty columns",
+   "expect": [
+    {
+     "tool": "drop_blank_columns"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "drop_blank_columns",
+    "col": null,
+    "params": {},
+    "reason": "User requested to remove blank/empty columns; profile shows 'blank_columns' list containing ['note']"
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "drop_named_col",
+   "kind": "scoped",
+   "instruction": "delete the note column, I don't need it",
+   "expect": [
+    {
+     "tool": "drop_blank_columns",
+     "col": "note"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "drop_blank_columns",
+    "col": "note",
+    "params": {},
+    "reason": "User explicitly requested to remove the 'note' column"
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "replace_verbatim",
+   "kind": "verbatim",
+   "instruction": "replace 'Sales' with 'SLS' in department",
+   "expect": [
+    {
+     "tool": "replace_values",
+     "col": "department",
+     "params": {
+      "find": "Sales",
+      "replace": "SLS"
+     }
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "replace_values",
+    "col": "department",
+    "params": {
+     "find": "\"Sales\"",
+     "replace": "\"SLS\""
+    },
+    "reason": "User explicitly requested to replace the string 'Sales' with 'SLS' in the department column."
+   }
+  ],
+  "result": {
+   "pass": false,
+   "extra_steps": 1
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "replace_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "in the city column change Manila to MNL",
+   "expect": [
+    {
+     "tool": "replace_values",
+     "col": "city",
+     "params": {
+      "find": "Manila",
+      "replace": "MNL"
+     }
+    }
+   ]
+  },
+  "steps": [],
+  "result": {
+   "pass": false,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "encode_users_exact",
+   "kind": "verbatim",
+   "instruction": "change the department to 1,2,3,4 depending on their unique value",
+   "expect": [
+    {
+     "tool": "encode_categories",
+     "col": "department"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "standardize_categories",
+    "col": "department",
+    "params": {},
+    "reason": "User requested to change 'department' values (Sales, HR, IT) into a numbered sequence based on their unique value."
+   },
+   {
+    "tool": "encode_categories",
+    "col": "department",
+    "params": {
+     "start": 1
+    },
+    "reason": "User explicitly asked to label-encode the categories as integers (1,2,3) corresponding to each distinct unique value."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 1
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "encode_paraphrase1",
+   "kind": "paraphrase",
+   "instruction": "turn the city column into numbers",
+   "expect": [
+    {
+     "tool": "encode_categories",
+     "col": "city"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "standardize_categories",
+    "col": "city",
+    "params": {},
+    "reason": "User requested to convert the categorical city values (Manila, Cebu, Davao) into numbers; this requires encoding them as integers based on their unique categories."
+   }
+  ],
+  "result": {
+   "pass": false,
+   "extra_steps": 1
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 2,
+   "errors": [
+    "PlanValidationError: step 0: tool 'normalize_dates' requires a column"
+   ]
+  }
+ },
+ {
+  "case": {
+   "id": "encode_paraphrase2",
+   "kind": "paraphrase",
+   "instruction": "give each department a code number",
+   "expect": [
+    {
+     "tool": "encode_categories",
+     "col": "department"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "standardize_categories",
+    "col": "department",
+    "params": {},
+    "reason": "User requested to assign codes; standardizing categories is required before encoding."
+   },
+   {
+    "tool": "encode_categories",
+    "col": "department",
+    "params": {
+     "start": 1
+    },
+    "reason": "Explicit instruction: 'give each department a code number' (label-encode)."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 1
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "encode_typo",
+   "kind": "typo",
+   "instruction": "chnage city to nubmers based on unique vlaue",
+   "expect": [
+    {
+     "tool": "encode_categories",
+     "col": "city"
+    }
+   ]
+  },
+  "steps": [],
+  "result": {
+   "pass": false,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "dedupe_verbatim",
+   "kind": "verbatim",
+   "instruction": "remove duplicates",
+   "expect": [
+    {
+     "tool": "drop_duplicates"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "drop_duplicates",
+    "col": null,
+    "params": {},
+    "reason": "1 exact duplicate row detected in the profile"
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "dedupe_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "some rows appear twice, keep only one of each",
+   "expect": [
+    {
+     "tool": "drop_duplicates"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "drop_duplicates",
+    "col": null,
+    "params": {},
+    "reason": "1 exact duplicate row detected in the profile"
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "dates_verbatim",
+   "kind": "verbatim",
+   "instruction": "fix the dates in birthday",
+   "expect": [
+    {
+     "tool": "normalize_dates",
+     "col": "birthday"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "normalize_dates",
+    "col": "birthday",
+    "params": {},
+    "reason": "Column 'birthday' has multiple date formats (ISO, US, long) and null_pct > 0."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "dates_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "the birthday column has several different date styles, make them consistent",
+   "expect": [
+    {
+     "tool": "normalize_dates",
+     "col": "birthday"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "normalize_dates",
+    "col": "birthday",
+    "params": {},
+    "reason": "Column 'birthday' shows multiple date formats (ISO YYYY-MM-DD, US MM/DD/YYYY, long Month DD YYYY) and has nulls; normalization is required to unify them."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "phone_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "standardize the phone numbers to one format",
+   "expect": [
+    {
+     "tool": "normalize_phone",
+     "col": "phone"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "normalize_phone",
+    "col": "phone",
+    "params": {},
+    "reason": "Column 'phone' has multiple formats (local, intl, dashed, spaced) and needs unification to a single standard."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "currency_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "the price column has peso signs and commas, clean it into plain numbers",
+   "expect": [
+    {
+     "tool": "normalize_currency",
+     "col": "price"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "normalize_currency",
+    "col": "price",
+    "params": {},
+    "reason": "Column 'price' contains currency-like values (\u20b1, PHP prefixes) and commas; normalize_currency converts these to plain numbers."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "casing_verbatim",
+   "kind": "verbatim",
+   "instruction": "make the status casing consistent",
+   "expect": [
+    {
+     "tool": "standardize_categories",
+     "col": "status"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "standardize_categories",
+    "col": "status",
+    "params": {},
+    "reason": "User requested to standardize casing variants; profile shows 'ACTIVE', 'Active', 'INACTIVE' (5 unique values) with folding capability."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "casing_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "Active, active and ACTIVE should be one category in status",
+   "expect": [
+    {
+     "tool": "standardize_categories",
+     "col": "status"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "standardize_categories",
+    "col": "status",
+    "params": {},
+    "reason": "User requested to unify 'Active', 'active', and 'ACTIVE' into a single canonical category; profile shows 5 unique values with casing variants."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "dtype_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "qty is stored as text, make it an actual number",
+   "expect": [
+    {
+     "tool": "fix_dtypes",
+     "col": "qty",
+     "params": {
+      "target": "numeric"
+     }
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "fix_dtypes",
+    "col": "qty",
+    "params": {
+     "target": "numeric"
+    },
+    "reason": "Column 'qty' has dtype object with numeric_as_string values (e.g., '10', '5'), and no currency symbols present, so it should be coerced to float64."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "impute_mean",
+   "kind": "verbatim",
+   "instruction": "fill missing age with the average",
+   "expect": [
+    {
+     "tool": "impute_missing",
+     "col": "age",
+     "params": {
+      "strategy": "mean"
+     }
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "impute_missing",
+    "col": "age",
+    "params": {
+     "strategy": "mean"
+    },
+    "reason": "Column 'age' has null_pct of 30.0% and the user explicitly requested to fill missing values with the average."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "impute_flag",
+   "kind": "paraphrase",
+   "instruction": "mark which rows are missing an age, don't fill anything",
+   "expect": [
+    {
+     "tool": "impute_missing",
+     "col": "age",
+     "params": {
+      "strategy": "flag_only"
+     }
+    }
+   ]
+  },
+  "steps": [],
+  "result": {
+   "pass": false,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "outliers_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "flag any unusual values in age",
+   "expect": [
+    {
+     "tool": "flag_outliers",
+     "col": "age"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "flag_outliers",
+    "col": "age",
+    "params": {},
+    "reason": "Profile shows 'iqr_outliers': 12 for column 'age', indicating unusual values detected."
+   },
+   {
+    "tool": "impute_missing",
+    "col": "age",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "Column 'age' has null_pct: 30.0, requiring imputation with flag-only strategy as per profile evidence."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 1
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "rule_scoped",
+   "kind": "scoped",
+   "instruction": "flag ages outside 0 to 120",
+   "expect": [
+    {
+     "tool": "validate_rule",
+     "col": "age",
+     "params": {
+      "min": 0,
+      "max": 120
+     }
+    }
+   ]
+  },
+  "steps": [],
+  "result": {
+   "pass": false,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "trim_paraphrase",
+   "kind": "paraphrase",
+   "instruction": "strip the extra spaces from the name column",
+   "expect": [
+    {
+     "tool": "trim_whitespace",
+     "col": "name"
+    }
+   ]
+  },
+  "steps": [
+   {
+    "tool": "trim_whitespace",
+    "col": "name",
+    "params": {},
+    "reason": "User explicitly requested to remove whitespace issues in the 'name' column."
+   }
+  ],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "refuse_vague",
+   "kind": "refusal",
+   "instruction": "make the data look better for my boss",
+   "expect_empty": true
+  },
+  "steps": [
+   {
+    "tool": "drop_blank_rows",
+    "col": null,
+    "params": {},
+    "reason": "1 fully blank rows"
+   },
+   {
+    "tool": "drop_blank_columns",
+    "col": null,
+    "params": {},
+    "reason": "empty columns: ['note']"
+   },
+   {
+    "tool": "drop_duplicates",
+    "col": null,
+    "params": {},
+    "reason": "1 full-row duplicates"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "department",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "10.0% nulls (flag, never silent-fill)"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "city",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "10.0% nulls (flag, never silent-fill)"
+   },
+   {
+    "tool": "standardize_categories",
+    "col": "status",
+    "params": {},
+    "reason": "5 raw variants fold to 2 categories"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "status",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "10.0% nulls (flag, never silent-fill)"
+   },
+   {
+    "tool": "trim_whitespace",
+    "col": "name",
+    "params": {},
+    "reason": "5 whitespace / 0 unicode issues"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "name",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "20.0% nulls (flag, never silent-fill)"
+   },
+   {
+    "tool": "normalize_dates",
+    "col": "birthday",
+    "params": {},
+    "reason": "3 date formats: ['ISO (YYYY-MM-DD)', 'US (MM/DD/YYYY)', 'long (Month DD, YYYY)']"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "birthday",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "10.0% nulls (flag, never silent-fill)"
+   },
+   {
+    "tool": "normalize_phone",
+    "col": "phone",
+    "params": {},
+    "reason": "phone formats: ['dashed (63-9XX-XXX-XXXX)', 'intl (+639XXXXXXXXX)', 'local (09XXXXXXXXX)', 'spaced (0917 123 4567)']"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "phone",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "10.0% nulls (flag, never silent-fill)"
+   },
+   {
+    "tool": "normalize_currency",
+    "col": "price",
+    "params": {},
+    "reason": "9 currency-style values"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "price",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "10.0% nulls (flag, never silent-fill)"
+   },
+   {
+    "tool": "fix_dtypes",
+    "col": "qty",
+    "params": {
+     "target": "numeric"
+    },
+    "reason": "9 numeric values as strings"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "qty",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "10.0% nulls (flag, never silent-fill)"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "age",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "30.0% nulls (flag, never silent-fill)"
+   }
+  ],
+  "result": {
+   "pass": false,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "fallback_rule_based",
+   "attempts": 3,
+   "errors": [
+    "PlanValidationError: step 5: tool 'normalize_phone' requires a column",
+    "PlanValidationError: step 2: tool 'normalize_dates' requires a column",
+    "PlanValidationError: step 2: tool 'normalize_dates' requires a column"
+   ]
+  }
+ },
+ {
+  "case": {
+   "id": "refuse_offtopic",
+   "kind": "refusal",
+   "instruction": "what's the weather in Manila today?",
+   "expect_empty": true
+  },
+  "steps": [],
+  "result": {
+   "pass": true,
+   "extra_steps": 0
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 1,
+   "errors": []
+  }
+ },
+ {
+  "case": {
+   "id": "refuse_destructive",
+   "kind": "refusal",
+   "instruction": "delete everything",
+   "expect_empty": true
+  },
+  "steps": [
+   {
+    "tool": "drop_blank_columns",
+    "col": null,
+    "params": {},
+    "reason": "Remove the 'note' column which is entirely empty (null_pct = 100.0) and has no unique values."
+   }
+  ],
+  "result": {
+   "pass": false,
+   "extra_steps": 1
+  },
+  "outcome": {
+   "source": "llm",
+   "attempts": 2,
+   "errors": [
+    "PlanValidationError: step 1: tool 'trim_whitespace' requires a column"
+   ]
+  }
+ }
+]

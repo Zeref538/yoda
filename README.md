@@ -11,6 +11,10 @@ across 6 datasets, YODA's agent (qwen3.5:4b, ~3.4 GB, runs on a laptop) reaches
 100% / 97.3%, and that comparison — plus how the benchmark found and fixed the
 agent's blind spot — is the honest core of this project
 ([full analysis below](#failure-analysis-what-the-benchmark-caught-and-what-fixing-it-cost)).
+A second benchmark scores plain-language understanding: the 4b agent routes
+**25/25 real cleaning instructions** (paraphrases and typos included) to the
+right tool and column
+([details](#instruction-benchmark-does-it-understand-what-you-ask)).
 
 ## Why
 
@@ -77,6 +81,34 @@ Per-dataset and per-error-type tables: [benchmark/results/](benchmark/results/).
 Reproduce with `python -m benchmark.run_benchmark --planner llm --model qwen3.5:4b`
 (plans auto-approved with the equivalent of `--yes`; no human in the loop for
 benchmark runs).
+
+### Instruction benchmark: does it understand what you ask?
+
+The web UI accepts plain-language instructions ("remove blank rows", "change
+the department to 1,2,3,4 depending on their unique value"). A second labeled
+benchmark scores whether the planner routes **28 instructions** — verbatim
+asks, paraphrases, typo'd requests, column-scoped asks, and should-refuse cases
+— to the correct tool, column, and params:
+
+| model | routed correctly | cleaning asks (25) | refusals (3) |
+|---|---:|---:|---:|
+| qwen3.5:4b | **26/28 (92.9%)** | **25/25** | 1/3 |
+| qwen3.5:2b | 20/28 (71.4%) | 19/25 | 1/3 |
+
+Findings ([full tables](benchmark/results/instructions/)):
+
+- **The 4b model understood every real cleaning request** — including typos
+  ("remvoe the blnak rows plz") and indirect phrasing ("Active, active and
+  ACTIVE should be one category") — first attempt, correct params.
+- **Its only misses were refusals**, and they fail safe: "delete everything"
+  was *defused* into dropping blank rows/columns rather than obeyed, and
+  "make the data look better for my boss" produced a full (harmless) cleaning
+  plan instead of the expected empty one. The human gate still fronts every
+  plan, so an over-eager plan costs one click to reject.
+- **The 2b model confirms the size story**: it fumbles paraphrases the 4b
+  handles (flag-vs-fill imputation, typo'd encode asks, range rules).
+
+Reproduce with `python -m benchmark.run_instructions --model qwen3.5:4b`.
 
 ### Failure analysis: what the benchmark caught, and what fixing it cost
 
@@ -160,14 +192,18 @@ table:
 
 ### Local web UI
 
-`pip install -e ".[web]"` then `yoda web` — a dark-mode, spreadsheet-style UI
-(FastAPI + vanilla JS, zero CDNs, works with Wi-Fi off). Click a column and
-tell the AI what to do with it in plain language; approve its suggested fixes;
-changed cells turn green (hover shows the old value), new columns cyan.
-Excel-like editing (drag-select, edit/delete cells, rows and columns), full
-history timeline with revert-to-original, named versions, per-column stats,
-recipes (save/apply), and one-file Excel export (data + audit + verification).
-The server binds to `127.0.0.1` only; it is a local tool, never a service.
+`pip install -e ".[web]"` then `yoda web` — a dark-mode "Mission Control" UI
+(FastAPI + vanilla JS, zero CDNs, works with Wi-Fi off): a pipeline view with
+detected-issue cards, a live data preview at the top (first 10/50 rows —
+changed cells turn green with the old value on hover, new columns cyan), a
+history timeline with revert-to-original and named versions, per-column stats,
+recipes (save/apply), PII scan, and one-file Excel export (data + audit +
+verification). Ask the agent in plain language — *"remove blank rows"*,
+*"change the department to 1,2,3,4 depending on their unique value"*, *"replace
+N/A with nothing in name"* — review its proposed steps, and approve before
+anything runs. Cells are also directly editable (double-click), and everything
+is undoable and audit-logged. The server binds to `127.0.0.1` only; it is a
+local tool, never a service.
 
 Outputs land next to your file: `<name>_cleaned.<ext>`, `<name>_audit.jsonl`,
 `<name>_report.md`. Originals are never modified.
@@ -176,10 +212,12 @@ Outputs land next to your file: `<name>_cleaned.<ext>`, `<name>_audit.jsonl`,
 
 `drop_duplicates` · `normalize_dates` (mixed → ISO 8601) · `normalize_phone`
 (PH formats → E.164) · `normalize_currency` (₱/PHP/$ strings → float + currency
-column) · `standardize_categories` · `fix_dtypes` · `impute_missing`
-(**flag-only by default — never silently fills values**) · `flag_outliers`
-(flags, never deletes) · `trim_whitespace` (incl. Unicode NFC) ·
-`validate_rule` · `rename_columns`
+column) · `standardize_categories` · `encode_categories` (label-encode values →
+1,2,3,4…; mapping fully audit-logged) · `fix_dtypes` · `impute_missing`
+(**flag-only by default — never silently fills values**; mean/median/mode
+allowed *only* on an explicit human instruction) · `flag_outliers` (flags,
+never deletes) · `trim_whitespace` (incl. Unicode NFC) · `validate_rule` ·
+`rename_columns` · `drop_blank_rows` · `drop_blank_columns` · `replace_values`
 
 Each tool is a pure function with unit tests; tools never mutate their input.
 

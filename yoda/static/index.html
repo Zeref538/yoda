@@ -52,6 +52,10 @@
   input:focus-visible,textarea:focus-visible,select:focus-visible{
         outline:2px solid var(--accent-2);outline-offset:1px}
   textarea{resize:vertical;min-height:4.2rem;width:100%;font-size:.76rem}
+  .hintchips{display:flex;flex-wrap:wrap;gap:.35rem}
+  .chip{font:inherit;font-size:.66rem;color:var(--text-muted);background:var(--surface-2);
+    border:1px solid var(--border);border-radius:var(--r);padding:.18rem .6rem;cursor:pointer}
+  .chip:hover{color:var(--accent);border-color:var(--accent)}
 
   /* ---------- header ---------- */
   header{display:flex;align-items:center;gap:1rem;padding:.55rem 1rem;
@@ -352,6 +356,14 @@
         <div class="cards" id="issue-cards"></div>
 
         <div class="seclabel">ask the agent</div>
+        <div class="hintchips" id="hintchips" aria-label="Example instructions">
+          <button class="chip" type="button">remove blank rows</button>
+          <button class="chip" type="button">remove duplicates</button>
+          <button class="chip" type="button">fix the dates</button>
+          <button class="chip" type="button">change these to 1,2,3,4 by unique value</button>
+          <button class="chip" type="button">replace N/A with nothing</button>
+          <button class="chip" type="button">fill missing with the average</button>
+        </div>
         <textarea id="instruction"
           placeholder="optional — e.g. normalize all dates to ISO, but don't touch the email column…"
           aria-label="Instruction for the AI"></textarea>
@@ -367,6 +379,13 @@
         <div id="solutions" class="hidden" style="display:flex;flex-direction:column;gap:.6rem">
           <div class="seclabel">ai proposed solutions — approve to execute</div>
           <div id="sugg-box" style="display:flex;flex-direction:column;gap:.6rem"></div>
+        </div>
+
+        <div id="encode-box" class="hidden" style="display:flex;flex-direction:column;gap:.45rem">
+          <div class="seclabel">encoding legend</div>
+          <div id="encode-legend" class="micro" style="line-height:1.7"></div>
+          <button class="ghost small" id="btn-decode" style="align-self:flex-start"
+            title="restore the original category values (undoable)">Decode back to original values</button>
         </div>
 
         <div id="verify-box" class="hidden" style="display:flex;flex-direction:column;gap:.45rem">
@@ -743,6 +762,13 @@ function startThinking(){
 function stopThinking(){ clearInterval(actionTimer); $("#think").classList.add("hidden"); }
 
 $("#btn-suggest").addEventListener("click", suggest);
+$("#hintchips").addEventListener("click", e=>{
+  const chip = e.target.closest(".chip");
+  if(!chip) return;
+  const box = $("#instruction");
+  box.value = chip.textContent;
+  box.focus();
+});
 $("#instruction").addEventListener("keydown", e=>{
   if((e.ctrlKey||e.metaKey) && e.key==="Enter"){ e.preventDefault(); suggest(); }});
 
@@ -824,6 +850,38 @@ async function applyApproved(){
   state.busy = false;
 }
 
+function showEncodeLegend(entries){
+  state.encodes = entries;
+  $("#encode-legend").innerHTML = entries.map(a=>{
+    const pairs = Object.entries(a.mapping);
+    const shown = pairs.slice(0, 14)
+      .map(([v,c])=>`${esc(v)} = <b>${c}</b>`).join(" &middot; ");
+    const more = pairs.length > 14 ? ` &middot; &hellip;${pairs.length-14} more` : "";
+    return `<div><b>${esc(a.target||a.col)}</b>: ${shown}${more}</div>`;
+  }).join("");
+  $("#encode-box").classList.remove("hidden");
+}
+
+$("#btn-decode").addEventListener("click", async ()=>{
+  if(!state.encodes?.length || state.busy) return;
+  // Decode = apply the inverse mapping (code -> original value) through the
+  // normal execute path, so it lands in the audit log and is undoable.
+  const steps = state.encodes.map(a=>({tool:"standardize_categories",
+    col:a.target||a.col,
+    params:{mapping:Object.fromEntries(
+      Object.entries(a.mapping).map(([v,c])=>[String(c), v]))},
+    reason:"decode label codes back to original values"}));
+  state.busy = true;
+  try{
+    const d = await (await api("/api/execute",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({steps})})).json();
+    state.encodes = []; $("#encode-box").classList.add("hidden");
+    handleExecuted(d, steps.length);
+  }catch(e){ toast("Decode failed: "+e.message); }
+  state.busy = false;
+});
+
 function handleExecuted(d, nSteps){
   state.grid = d.grid; state.verdicts = d.verdicts; state.appliedAny = true;
   const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
@@ -842,6 +900,10 @@ function handleExecuted(d, nSteps){
   });
   renderIssueCards(); renderBuffer(); renderEntropy(); loadTimeline();
   renderVerdicts();
+  // encoding legend: surface the value=code mapping of any encode step
+  const enc = (d.audit||[]).filter(a=>a.tool==="encode_categories"
+                                      && a.mapping && a.status==="ok");
+  if(enc.length) showEncodeLegend(enc);
   state.suggestions = d.followup || [];
   if(state.suggestions.length)
     renderSuggestions("verifier follow-up — issues survived round "+d.round);

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yoda-agent"
-version = "0.2.0"
-description = "YODA — Your Offline Data Agent. Privacy-first, fully local data-cleaning agent: the LLM plans from metadata only; deterministic pandas executes."
+version = "0.3.0"
+description = "YODA â€” Your Offline Data Agent. Privacy-first, fully local data-cleaning agent: the LLM plans from metadata only; deterministic pandas executes."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -55,3 +55,4 @@ target-version = "py311"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
