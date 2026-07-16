@@ -234,6 +234,12 @@
         color:var(--text);border:1px solid var(--accent);border-radius:var(--r);
         padding:0 .2rem;text-transform:none;letter-spacing:0}
   .view-head{display:flex;align-items:center;gap:.5rem}
+  .dataview td{user-select:none}
+  .dataview td.sel{background:var(--accent-2-dim)!important;
+        box-shadow:inset 0 0 0 1px var(--accent-2)}
+  .dataview tr.rowsel td{background:var(--danger-dim)!important}
+  .dataview td.rownum{cursor:pointer}
+  .dataview tr.rowsel td.rownum{color:var(--danger)}
   .view-head .rowbtns{display:flex;gap:0}
   .view-head .rowbtns button{border-radius:0;min-height:26px;
         padding:.1rem .55rem;font-size:.6rem}
@@ -370,6 +376,12 @@
         <div class="view-head">
           <div class="seclabel" style="flex:1">data view
             <span id="view-note" style="letter-spacing:.02em;text-transform:none"></span></div>
+          <span id="dv-actions" class="hidden" style="display:flex;gap:.35rem">
+            <button class="ghost small" id="dv-clear">clear cells</button>
+            <button class="ghost small" id="dv-delrows"
+              style="color:var(--danger);border-color:var(--danger)">delete rows</button>
+            <button class="ghost small" id="dv-unsel" title="Deselect (Esc)">&#10005;</button>
+          </span>
           <div class="rowbtns" role="group" aria-label="Preview row count">
             <button class="active" data-rows="10">10</button>
             <button data-rows="50">50</button>
@@ -390,12 +402,9 @@
           <button class="chip" type="button">remove duplicates</button>
           <button class="chip" type="button">fix the dates</button>
           <button class="chip" type="button">delete rows where status is inactive</button>
-          <button class="chip" type="button">change these to 1,2,3,4 by unique value</button>
-          <button class="chip" type="button">replace every A with B</button>
           <button class="chip" type="button">fill missing with the average</button>
-          <button class="chip" type="button">make names title case</button>
           <button class="chip" type="button">remove the outliers</button>
-          <button class="chip" type="button">normalize between 0 and 1</button>
+          <button class="chip" type="button">normalize</button>
         </div>
         <textarea id="instruction"
           placeholder="optional — e.g. normalize all dates to ISO, but don't touch the email column…"
@@ -667,7 +676,120 @@ function renderDataView(){
   });
   box.querySelectorAll("td[data-c]").forEach(td=>
     td.addEventListener("dblclick", ()=>editCellInline(td)));
+  wireDataViewSelection(box);
+  dvClearSel();
 }
+
+/* ---------- excel-style selection: drag cells, click row numbers ---------- */
+const dvSel = {cells:new Set(), rows:new Set(), anchor:null, lastRow:null};
+let dvDragging = false;
+
+function dvClearSel(){
+  dvSel.cells.clear(); dvSel.rows.clear(); dvSel.anchor = null;
+  dvPaint();
+}
+function dvPaint(){
+  const box = $("#dataview");
+  box.querySelectorAll("td[data-c]").forEach(td=>{
+    const key = td.closest("tr").dataset.rid + ":" + td.dataset.c;
+    td.classList.toggle("sel", dvSel.cells.has(key));
+  });
+  box.querySelectorAll("tbody tr").forEach(tr=>
+    tr.classList.toggle("rowsel", dvSel.rows.has(+tr.dataset.rid)));
+  const n = dvSel.cells.size, r = dvSel.rows.size;
+  $("#dv-actions").classList.toggle("hidden", !n && !r);
+  $("#dv-clear").classList.toggle("hidden", !n);
+  $("#dv-clear").textContent = `clear ${n} cell${n===1?"":"s"}`;
+  $("#dv-delrows").classList.toggle("hidden", !r);
+  $("#dv-delrows").textContent = `delete ${r} row${r===1?"":"s"}`;
+}
+function dvSelectRect(a, b){
+  // rectangle between two {row: visual index, ci} corners
+  const trs = [...$("#dataview").querySelectorAll("tbody tr")];
+  dvSel.cells.clear();
+  const [r1, r2] = [Math.min(a.row, b.row), Math.max(a.row, b.row)];
+  const [c1, c2] = [Math.min(a.ci, b.ci), Math.max(a.ci, b.ci)];
+  for(let r = r1; r <= r2; r++){
+    const rid = trs[r]?.dataset.rid;
+    if(rid === undefined) continue;
+    for(let c = c1; c <= c2; c++) dvSel.cells.add(rid + ":" + c);
+  }
+}
+function wireDataViewSelection(box){
+  const trs = ()=>[...box.querySelectorAll("tbody tr")];
+  box.querySelectorAll("td[data-c]").forEach(td=>{
+    td.addEventListener("mousedown", e=>{
+      if(e.button !== 0 || editing) return;
+      const pos = {row: trs().indexOf(td.closest("tr")), ci: +td.dataset.c};
+      dvSel.rows.clear();
+      dvDragging = true; dvSel.anchor = pos;
+      dvSelectRect(pos, pos); dvPaint();
+    });
+    td.addEventListener("mouseenter", ()=>{
+      if(!dvDragging || !dvSel.anchor) return;
+      dvSelectRect(dvSel.anchor,
+        {row: trs().indexOf(td.closest("tr")), ci: +td.dataset.c});
+      dvPaint();
+    });
+  });
+  box.querySelectorAll("td.rownum").forEach(td=>{
+    td.title = "Click to select the row (Shift for a range)";
+    td.addEventListener("click", e=>{
+      const rid = +td.closest("tr").dataset.rid;
+      dvSel.cells.clear(); dvSel.anchor = null;
+      if(e.shiftKey && dvSel.lastRow !== null){
+        const all = trs().map(tr=>+tr.dataset.rid);
+        const [i1, i2] = [all.indexOf(dvSel.lastRow), all.indexOf(rid)];
+        all.slice(Math.min(i1,i2), Math.max(i1,i2)+1)
+           .forEach(r=>dvSel.rows.add(r));
+      }else if(e.ctrlKey || e.metaKey){
+        dvSel.rows.has(rid) ? dvSel.rows.delete(rid) : dvSel.rows.add(rid);
+      }else{
+        const solo = dvSel.rows.size===1 && dvSel.rows.has(rid);
+        dvSel.rows.clear();
+        if(!solo) dvSel.rows.add(rid);
+      }
+      dvSel.lastRow = rid; dvPaint();
+    });
+  });
+}
+document.addEventListener("mouseup", ()=>{ dvDragging = false; });
+
+async function dvEdit(body, okMsg){
+  try{
+    const d = await (await api("/api/edit",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body)})).json();
+    state.grid = d.grid; state.appliedAny = true;
+    renderBuffer(); loadTimeline();
+    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+    toast(okMsg + " — Ctrl+Z to undo");
+  }catch(e){ toast("Edit failed: " + e.message); }
+}
+function dvClearCells(){
+  if(!dvSel.cells.size) return;
+  const cells = [...dvSel.cells].map(k=>{
+    const [rid, ci] = k.split(":");
+    return {rid: +rid, col: state.grid.columns[+ci]};
+  });
+  dvEdit({op:"clear_cells", cells}, `cleared ${cells.length} cell(s)`);
+}
+function dvDeleteRows(){
+  if(!dvSel.rows.size) return;
+  dvEdit({op:"delete_rows", rids:[...dvSel.rows]},
+         `deleted ${dvSel.rows.size} row(s)`);
+}
+$("#dv-clear").addEventListener("click", dvClearCells);
+$("#dv-delrows").addEventListener("click", dvDeleteRows);
+$("#dv-unsel").addEventListener("click", dvClearSel);
+document.addEventListener("keydown", e=>{
+  if(editing || e.target.matches("input,textarea,select")) return;
+  if(e.key === "Escape") dvClearSel();
+  else if(e.key === "Delete" || e.key === "Backspace"){
+    if(dvSel.rows.size){ e.preventDefault(); dvDeleteRows(); }
+    else if(dvSel.cells.size){ e.preventDefault(); dvClearCells(); }
+  }
+});
 
 /* ---------- raw buffer (small preview) ---------- */
 const BUFFER_ROWS = 8;
