@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YODA — Your Offline Data Agent</title>
+<style>
+  /* "Mission Control" — concept generated with Google Stitch (Technical
+     Precision design system), implemented by hand. Fully offline. */
+  :root{
+    --bg:#0a0c10; --surface:#111318; --surface-2:#16191f; --border:#333539;
+    --line:#1d2026; --text:#e2e2e8; --text-muted:#859490;
+    --accent:#3cddc7; --accent-dim:rgba(60,221,199,.10);
+    --accent-2:#7bd0ff; --accent-2-dim:rgba(123,208,255,.10);
+    --ok:#62fae3; --ok-dim:rgba(98,250,227,.08);
+    --warn:#ffd649; --warn-dim:rgba(255,214,73,.10);
+    --danger:#ffb4ab; --danger-dim:rgba(255,180,171,.10);
+    --mono:"JetBrains Mono",ui-monospace,'Cascadia Code',Consolas,monospace;
+    --r:3px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{color-scheme:dark}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);
+       font-size:13px;line-height:1.55;height:100dvh;display:flex;
+       flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--accent-dim);color:var(--accent)}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:var(--bg)}
+  ::-webkit-scrollbar-thumb{background:var(--border)}
+  ::-webkit-scrollbar-thumb:hover{background:#454a52}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  .micro{text-transform:uppercase;letter-spacing:.14em;font-size:.62rem;
+         color:var(--text-muted)}
+  .hidden{display:none!important}
+  .grow{flex:1}
+
+  button{font:inherit;cursor:pointer;border-radius:var(--r);padding:.42rem .85rem;
+         border:1px solid var(--border);background:var(--surface-2);color:var(--text);
+         transition:border-color .15s,background .15s,color .15s;min-height:36px;
+         text-transform:uppercase;letter-spacing:.08em;font-size:.68rem}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#04211c;
+         font-weight:700}
+  button.primary:hover{background:#62fae3;color:#04211c}
+  button.ghost{background:transparent}
+  button.small{min-height:28px;padding:.15rem .6rem;font-size:.62rem}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input[type=text],textarea,select{font:inherit;background:var(--bg);color:var(--text);
+        border:1px solid var(--border);border-radius:var(--r);padding:.5rem .7rem}
+  input:focus-visible,textarea:focus-visible,select:focus-visible{
+        outline:2px solid var(--accent-2);outline-offset:1px}
+  textarea{resize:vertical;min-height:4.2rem;width:100%;font-size:.76rem}
+  .hintchips{display:flex;flex-wrap:wrap;gap:.35rem}
+  .chip{font:inherit;font-size:.66rem;color:var(--text-muted);background:var(--surface-2);
+    border:1px solid var(--border);border-radius:var(--r);padding:.18rem .6rem;cursor:pointer}
+  .chip:hover{color:var(--accent);border-color:var(--accent)}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;gap:1rem;padding:.55rem 1rem;
+         background:var(--surface);border-bottom:1px solid var(--border);z-index:30}
+  .logo{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:.95rem;
+        letter-spacing:.08em}
+  .logo svg{color:var(--accent)}
+  nav.tabs{display:flex;gap:.2rem}
+  nav.tabs button{border:none;background:transparent;min-height:34px;
+        color:var(--text-muted);border-bottom:2px solid transparent;border-radius:0}
+  nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .filechip{font-size:.7rem;color:var(--text);background:var(--surface-2);
+         border:1px solid var(--border);border-radius:var(--r);padding:.26rem .6rem}
+  header select.model{appearance:none;-webkit-appearance:none;width:10rem;
+     min-height:36px;font-size:.72rem;cursor:pointer;
+     background-color:var(--surface-2);color:var(--accent-2);
+     border:1px solid var(--border);border-radius:var(--r);
+     padding:.38rem 1.9rem .38rem .65rem;
+     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23859490' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+     background-repeat:no-repeat;background-position:right .55rem center}
+  header select.model option{background:var(--surface);color:var(--text)}
+
+  /* ---------- 3-column stage ---------- */
+  .stage{flex:1;display:grid;grid-template-columns:16.5rem 1fr 19rem;min-height:0}
+  @media (max-width:1100px){.stage{grid-template-columns:14rem 1fr}
+    .right{display:none}}
+  .left,.right{background:var(--surface);overflow-y:auto;padding:1rem;
+        display:flex;flex-direction:column;gap:1rem}
+  .left{border-right:1px solid var(--border)}
+  .right{border-left:1px solid var(--border)}
+  .center{overflow-y:auto;padding:1.25rem 1.5rem;display:flex;
+        flex-direction:column;gap:1.1rem}
+
+  .paneltitle{color:var(--accent);font-weight:700;font-size:.8rem;
+        letter-spacing:.06em}
+  .paneltitle small{display:block;color:var(--text-muted);font-weight:400;
+        font-size:.62rem;letter-spacing:.02em}
+  .seclabel{text-transform:uppercase;letter-spacing:.14em;font-size:.62rem;
+        color:var(--text-muted);display:flex;align-items:center;gap:.5rem}
+  .seclabel::after{content:"";height:1px;flex:1;background:var(--border)}
+
+  /* ---------- left: timeline + versions ---------- */
+  .tl{display:flex;flex-direction:column;gap:.1rem;position:relative}
+  .tl-item{display:flex;gap:.6rem;padding:.35rem 0;font-size:.68rem;
+        align-items:flex-start}
+  .tl-item .dot{width:.5rem;height:.5rem;border-radius:50%;margin-top:.3rem;
+        flex-shrink:0;background:var(--text-muted)}
+  .tl-item.k-upload .dot{background:var(--accent-2)}
+  .tl-item.k-ai .dot{background:var(--accent)}
+  .tl-item.k-manual .dot{background:var(--warn)}
+  .tl-item.k-revert .dot{background:var(--text-muted)}
+  .tl-item .when{color:var(--text-muted);font-size:.6rem}
+  .tl-item .lbl{line-height:1.4}
+  .tl-item button{margin-left:auto}
+  .ver-row{display:flex;align-items:center;gap:.4rem;font-size:.68rem;
+        padding:.3rem 0;border-bottom:1px solid var(--line)}
+  .ver-row .nm{color:var(--accent-2)}
+
+  /* ---------- center: cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));
+        gap:.8rem}
+  .card{background:var(--surface);border:1px solid var(--border);
+        border-radius:var(--r);padding:.85rem .9rem;cursor:pointer;
+        transition:border-color .15s;display:flex;flex-direction:column;gap:.45rem}
+  .card:hover{border-color:var(--accent)}
+  .card.active{border-color:var(--accent);background:var(--accent-dim)}
+  .card .k{font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;
+        color:var(--accent-2)}
+  .card .t{font-size:.92rem;font-weight:700;line-height:1.3}
+  .card .n{margin-left:auto;background:var(--warn);color:#221a00;font-weight:700;
+        border-radius:var(--r);font-size:.62rem;padding:.05rem .4rem}
+  .card .colname{color:var(--text-muted);font-size:.66rem}
+  .card .minibar{display:flex;gap:2px;align-items:flex-end;height:2rem}
+  .card .minibar i{flex:1;background:var(--accent);opacity:.35;min-height:2px}
+  .card .minibar i.hot{opacity:1}
+
+  /* suggestions */
+  .suggestion{border:1px solid var(--border);border-left:2px solid var(--border);
+        border-radius:var(--r);padding:.7rem .8rem;background:var(--surface);
+        display:flex;gap:.7rem;align-items:flex-start;cursor:pointer;
+        transition:border-color .15s,background .15s}
+  .suggestion:hover{border-color:var(--accent)}
+  .suggestion.on{border-color:var(--accent);border-left-color:var(--accent);
+        background:var(--accent-dim)}
+  .suggestion .tick{flex-shrink:0;width:1.15rem;height:1.15rem;border-radius:var(--r);
+        border:1.5px solid var(--border);display:flex;align-items:center;
+        justify-content:center;color:transparent;font-size:.68rem;margin-top:.1rem}
+  .suggestion.on .tick{background:var(--accent);border-color:var(--accent);color:#04211c}
+  .suggestion .tool{font-weight:700;color:var(--accent);font-size:.76rem}
+  .suggestion .on-col{color:var(--accent-2);font-size:.68rem}
+  .suggestion .why{color:var(--text-muted);font-size:.68rem;margin-top:.2rem;
+        line-height:1.45}
+  .thinking{display:flex;align-items:center;gap:.6rem;font-size:.72rem;
+        color:var(--accent-2)}
+  .spinner{width:.9rem;height:.9rem;border:2px solid var(--border);flex-shrink:0;
+        border-top-color:var(--accent-2);border-radius:50%;
+        animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .verdict{display:flex;justify-content:space-between;gap:.5rem;font-size:.68rem;
+        padding:.32rem .6rem;border-radius:var(--r);background:var(--surface);
+        border:1px solid var(--border)}
+  .v-resolved{color:var(--ok)} .v-flagged{color:var(--accent-2)}
+  .v-partially_resolved{color:var(--warn)}
+  .v-unresolved,.v-new_issue{color:var(--danger)}
+  .errbox{color:var(--danger);background:var(--danger-dim);
+        border:1px solid var(--danger);border-radius:var(--r);
+        padding:.5rem .7rem;font-size:.72rem}
+  .notebox{color:var(--text-muted);font-size:.66rem;border-left:2px solid var(--accent);
+        padding:.35rem .7rem;background:var(--surface);line-height:1.5}
+
+  /* ---------- right: raw buffer + entropy ---------- */
+  .buffer{border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .buffer table{border-collapse:collapse;width:100%;font-size:.62rem;
+        white-space:nowrap;table-layout:fixed}
+  .buffer th{background:var(--surface-2);text-align:left;padding:.25rem .45rem;
+        text-transform:uppercase;letter-spacing:.06em;font-size:.56rem;
+        color:var(--text-muted);border-bottom:1px solid var(--border);
+        overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .buffer th:hover{color:var(--accent)}
+  .buffer th.selected{color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+  .buffer td{padding:.22rem .45rem;border-bottom:1px solid var(--line);
+        color:var(--text-muted);overflow:hidden;text-overflow:ellipsis}
+  .buffer td.changed{background:var(--ok-dim);color:var(--ok)}
+  .buffer td.newcell{background:var(--accent-2-dim);color:var(--accent-2)}
+  .buffer td input{width:100%;font:inherit;background:var(--bg);color:var(--text);
+        border:1px solid var(--accent);border-radius:var(--r);padding:0 .2rem}
+  .entropy{display:grid;grid-template-columns:repeat(auto-fill,minmax(.85rem,1fr));
+        gap:3px}
+  .entropy i{aspect-ratio:1;border-radius:1px;background:var(--surface-2)}
+  .stat-tiles{display:grid;grid-template-columns:1fr 1fr;gap:.45rem}
+  .stat-tiles span{border:1px solid var(--border);border-radius:var(--r);
+        padding:.4rem .55rem;background:var(--surface-2);font-size:.78rem}
+  .stat-tiles b{display:block;font-size:.56rem;color:var(--text-muted);
+        text-transform:uppercase;letter-spacing:.14em;font-weight:400}
+  .bar-row{display:grid;grid-template-columns:minmax(3.5rem,40%) 1fr 2.2rem;
+        gap:.45rem;align-items:center;font-size:.6rem}
+  .bar-row .lbl{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;
+        white-space:nowrap;text-align:right}
+  .bar-row .track{background:var(--surface-2);height:.55rem}
+  .bar-row .fill{background:var(--accent);opacity:.8;height:100%}
+  .bar-row .n{color:var(--text-muted);text-align:right}
+
+  /* ---------- data view (top preview) ---------- */
+  .dataview{border:1px solid var(--border);border-radius:var(--r);
+        overflow:auto;max-height:21rem;background:var(--bg)}
+  .dataview table{border-collapse:separate;border-spacing:0;font-size:.7rem;
+        white-space:nowrap;min-width:100%}
+  .dataview th,.dataview td{border-right:1px solid var(--line);
+        border-bottom:1px solid var(--line);padding:.26rem .6rem;max-width:15rem;
+        overflow:hidden;text-overflow:ellipsis}
+  .dataview thead th{position:sticky;top:0;z-index:5;background:var(--surface-2);
+        color:var(--text);font-weight:700;text-align:left;cursor:pointer;
+        text-transform:uppercase;letter-spacing:.08em;font-size:.6rem;
+        border-bottom:1px solid var(--border)}
+  .dataview thead th:hover{color:var(--accent)}
+  .dataview thead th.selected{color:var(--accent);
+        box-shadow:inset 0 -2px 0 var(--accent)}
+  .dataview thead th.newcol{color:var(--accent-2);
+        box-shadow:inset 0 -2px 0 var(--accent-2)}
+  .dataview th .cnt{display:inline-block;min-width:1rem;text-align:center;
+        margin-left:.35rem;font-size:.56rem;border-radius:var(--r);
+        background:var(--warn);color:#221a00;padding:0 .22rem;font-weight:700}
+  .dataview td{color:var(--text-muted)}
+  .dataview td.rownum{position:sticky;left:0;background:var(--surface);
+        color:#4a5560;z-index:4;font-size:.58rem;border-right:1px solid var(--border)}
+  .dataview td.changed{background:var(--ok-dim);color:var(--ok)}
+  .dataview td.newcell{background:var(--accent-2-dim);color:var(--accent-2)}
+  .dataview td input{width:100%;font:inherit;background:var(--bg);
+        color:var(--text);border:1px solid var(--accent);border-radius:var(--r);
+        padding:0 .2rem;text-transform:none;letter-spacing:0}
+  .view-head{display:flex;align-items:center;gap:.5rem}
+  .view-head .rowbtns{display:flex;gap:0}
+  .view-head .rowbtns button{border-radius:0;min-height:26px;
+        padding:.1rem .55rem;font-size:.6rem}
+  .view-head .rowbtns button:first-child{border-radius:var(--r) 0 0 var(--r)}
+  .view-head .rowbtns button:last-child{border-radius:0 var(--r) var(--r) 0}
+  .view-head .rowbtns button.active{background:var(--accent);
+        border-color:var(--accent);color:#04211c;font-weight:700}
+
+  /* ---------- dropzone ---------- */
+  .empty{height:100%;display:flex;flex-direction:column;align-items:center;
+         justify-content:center;gap:1.1rem;padding:2rem}
+  .drop{border:1px dashed var(--border);border-radius:var(--r);
+        padding:3rem 3.5rem;text-align:center;cursor:pointer;
+        transition:border-color .2s;background:var(--surface)}
+  .drop:hover,.drop.over{border-color:var(--accent)}
+  .drop svg{color:var(--accent);margin-bottom:.75rem}
+  .drop .hint{color:var(--text-muted);font-size:.72rem}
+
+  /* ---------- statusbar / modal / toast / ctx ---------- */
+  .statusbar{display:flex;gap:1.2rem;align-items:center;padding:.4rem 1rem;
+       border-top:1px solid var(--border);background:var(--surface);
+       font-size:.62rem;color:var(--text-muted);flex-wrap:wrap;
+       text-transform:uppercase;letter-spacing:.1em}
+  .statusbar .lit{color:var(--accent)}
+  .modal{position:fixed;inset:0;z-index:100;background:rgba(4,6,9,.72);
+        display:flex;align-items:center;justify-content:center;padding:2rem}
+  .modal .inner{background:var(--surface);border:1px solid var(--border);
+        border-radius:var(--r);max-width:56rem;width:100%;max-height:85dvh;
+        display:flex;flex-direction:column}
+  .modal pre{flex:1;overflow:auto;padding:1.2rem;font-size:.7rem;
+        white-space:pre-wrap;color:var(--text-muted)}
+  .toast{position:fixed;bottom:3.4rem;left:50%;transform:translateX(-50%);
+        z-index:150;background:var(--surface-2);border:1px solid var(--accent);
+        border-left:3px solid var(--accent);color:var(--text);
+        border-radius:var(--r);padding:.55rem 1rem;font-size:.72rem}
+  .ctx{position:fixed;z-index:120;min-width:14rem;background:var(--surface-2);
+       border:1px solid var(--border);border-radius:var(--r);padding:.3rem;
+       box-shadow:0 10px 34px rgba(0,0,0,.6)}
+  .ctx .item{display:flex;width:100%;text-align:left;border:none;
+       background:transparent;border-radius:var(--r);padding:.42rem .7rem;
+       min-height:0;color:var(--text);cursor:pointer;text-transform:none;
+       letter-spacing:0;font-size:.74rem}
+  .ctx .item:hover{background:var(--accent-dim);color:var(--accent)}
+</style>
+<meta name="demo-wheel" content="yoda_agent-0.3.0-py3-none-any.whl">
+<style>
+  #demo-banner{background:var(--surface-2);border-bottom:1px solid var(--accent);
+    padding:.5rem .9rem;font-size:.7rem;line-height:1.5;color:var(--text);
+    display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+  #demo-banner b{color:var(--accent)}
+  #demo-banner a{color:var(--accent-2)}
+  #demo-status{color:var(--warn)}
+  #btn-sample{font:inherit;font-size:.68rem;color:var(--bg);background:var(--accent);
+    border:none;border-radius:var(--r);padding:.25rem .7rem;cursor:pointer;font-weight:700}
+</style>
+</head>
+<body>
+<div id="demo-banner">
+  <span><b>BROWSER DEMO</b> — the whole pipeline runs in <b>your</b> browser via
+  WebAssembly. Files you load never leave your machine (same guarantee as the
+  real tool). The AI planner needs a local install with Ollama; this demo uses
+  the deterministic rule-based planner.
+  <a href="https://github.com/Zeref538/yoda" target="_blank" rel="noopener">Get the real thing →</a></span>
+  <button id="btn-sample" disabled>Load sample messy CSV</button>
+  <span id="demo-status">loading…</span>
+</div>
+
+
+<header>
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+    YODA
+  </div>
+  <nav class="tabs" role="tablist">
+    <button class="active" data-tab="pipeline" role="tab" aria-selected="true">Pipeline</button>
+    <button data-tab="recipes" role="tab" aria-selected="false">Recipes</button>
+    <button data-tab="exports" role="tab" aria-selected="false">Exports</button>
+  </nav>
+  <span class="filechip hidden" id="filechip"></span>
+  <div class="grow"></div>
+  <span class="micro" style="color:var(--accent)">model:</span>
+  <select class="model" id="model" aria-label="Ollama model">
+    <option value="qwen3.5:4b">qwen3.5:4b</option>
+  </select>
+  <button id="btn-undo" class="ghost hidden" title="Undo last change (Ctrl+Z)">Undo</button>
+  <button id="btn-new" class="ghost hidden" title="Start over with a new file">New</button>
+</header>
+
+<div class="stage">
+
+  <!-- LEFT: mission control -->
+  <div class="left">
+    <div class="paneltitle">Mission Control
+      <small>offline agent v0.2.0</small></div>
+    <div class="seclabel">history timeline</div>
+    <div class="tl" id="timeline">
+      <div class="notebox">Load a file to begin. Every AI round, manual edit
+        and revert lands here — the original is always one click away.</div>
+    </div>
+    <div class="seclabel">saved versions</div>
+    <div id="versions"><div class="notebox">none yet</div></div>
+    <div style="display:flex;gap:.4rem">
+      <input type="text" id="version-name" placeholder="version name"
+             style="flex:1;min-width:0;font-size:.7rem" aria-label="New version name">
+      <button class="small" id="btn-save-version">Save</button>
+    </div>
+  </div>
+
+  <!-- CENTER: pipeline -->
+  <div class="center" id="center">
+    <!-- pipeline tab -->
+    <div id="tab-pipeline">
+      <div class="empty" id="empty">
+        <div class="micro" style="color:var(--accent-2)">01 // load your data</div>
+        <div class="drop" id="drop" role="button" tabindex="0"
+             aria-label="Upload a CSV, Excel, SQLite or Parquet file">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <polyline points="14 2 14 8 20 8"/></svg>
+          <div><strong>Drop a file</strong> or click to browse</div>
+          <div class="hint">.csv · .xlsx · .sqlite · .parquet — never leaves this machine</div>
+          <input type="file" id="file"
+                 accept=".csv,.xlsx,.xls,.sqlite,.db,.sqlite3,.parquet" hidden>
+        </div>
+        <div class="hint micro" style="max-width:30rem;text-align:center;line-height:1.7">
+          The AI plans repairs from redacted statistics only — raw rows never
+          reach the model. You approve every step before it runs.</div>
+      </div>
+
+      <div id="pipeline" class="hidden" style="display:flex;flex-direction:column;gap:1.1rem">
+        <div class="view-head">
+          <div class="seclabel" style="flex:1">data view
+            <span id="view-note" style="letter-spacing:.02em;text-transform:none"></span></div>
+          <div class="rowbtns" role="group" aria-label="Preview row count">
+            <button class="active" data-rows="10">10</button>
+            <button data-rows="50">50</button>
+            <button data-rows="0" title="Hide the data view">hide</button>
+          </div>
+        </div>
+        <div class="dataview" id="dataview" aria-label="Data preview"></div>
+        <div>
+          <div class="paneltitle" style="font-size:1rem">Pipeline Analysis</div>
+          <div class="micro" id="analysis-sub"></div>
+        </div>
+        <div class="cards" id="issue-cards"></div>
+
+        <div class="seclabel">ask the agent</div>
+        <div class="hintchips" id="hintchips" aria-label="Example instructions">
+          <button class="chip" type="button">remove blank rows</button>
+          <button class="chip" type="button">remove duplicates</button>
+          <button class="chip" type="button">fix the dates</button>
+          <button class="chip" type="button">change these to 1,2,3,4 by unique value</button>
+          <button class="chip" type="button">replace N/A with nothing</button>
+          <button class="chip" type="button">fill missing with the average</button>
+        </div>
+        <textarea id="instruction"
+          placeholder="optional — e.g. normalize all dates to ISO, but don't touch the email column…"
+          aria-label="Instruction for the AI"></textarea>
+        <div style="display:flex;gap:.6rem;align-items:center">
+          <button class="primary" id="btn-suggest" style="flex:1">Run analysis</button>
+          <span class="micro" id="scope-note"></span>
+        </div>
+        <div id="think" class="hidden thinking"><span class="spinner"></span>
+          <span id="think-word" class="grow"></span>
+          <button class="ghost small" id="btn-cancel">Cancel</button></div>
+        <div id="sugg-error"></div>
+
+        <div id="solutions" class="hidden" style="display:flex;flex-direction:column;gap:.6rem">
+          <div class="seclabel">ai proposed solutions — approve to execute</div>
+          <div id="sugg-box" style="display:flex;flex-direction:column;gap:.6rem"></div>
+        </div>
+
+        <div id="encode-box" class="hidden" style="display:flex;flex-direction:column;gap:.45rem">
+          <div class="seclabel">encoding legend</div>
+          <div id="encode-legend" class="micro" style="line-height:1.7"></div>
+          <button class="ghost small" id="btn-decode" style="align-self:flex-start"
+            title="restore the original category values (undoable)">Decode back to original values</button>
+        </div>
+
+        <div id="verify-box" class="hidden" style="display:flex;flex-direction:column;gap:.45rem">
+          <div class="seclabel">verification</div>
+          <div id="verdicts" style="display:flex;flex-direction:column;gap:.4rem"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- recipes tab -->
+    <div id="tab-recipes" class="hidden" style="display:flex;flex-direction:column;gap:1rem">
+      <div class="paneltitle" style="font-size:1rem">Recipes</div>
+      <div class="notebox">A recipe is a cleaning plan you already approved —
+        save it once, replay it on next week's file, or feed it to
+        <span style="color:var(--accent)">yoda watch</span> for a self-cleaning
+        drop folder.</div>
+      <div style="display:flex;gap:.6rem">
+        <button class="primary" id="btn-save-recipe">Save applied steps as recipe</button>
+        <button id="btn-apply-recipe">Apply a recipe file…</button>
+        <input type="file" id="recipe-file" accept=".json" hidden>
+      </div>
+      <div id="recipe-info" class="micro"></div>
+    </div>
+
+    <!-- exports tab -->
+    <div id="tab-exports" class="hidden" style="display:flex;flex-direction:column;gap:1rem">
+      <div class="paneltitle" style="font-size:1rem">Exports</div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <a id="dl" href="/api/download" download><button class="primary">Cleaned CSV</button></a>
+        <a id="dlx" href="/api/download_xlsx" download>
+          <button title="cleaned data + audit log + verification">Excel bundle</button></a>
+        <button id="btn-report">View report</button>
+      </div>
+      <div class="seclabel">pii scan</div>
+      <div id="pii-box" style="display:flex;flex-direction:column;gap:.4rem">
+        <div class="notebox">load a file first</div></div>
+      <pre class="hidden" id="report-pre"
+           style="background:var(--surface);border:1px solid var(--border);
+                  border-radius:var(--r);padding:1rem;font-size:.7rem;
+                  white-space:pre-wrap;max-height:24rem;overflow:auto"></pre>
+    </div>
+  </div>
+
+  <!-- RIGHT: local intel -->
+  <div class="right">
+    <div class="paneltitle">Local Intel
+      <small id="intel-sub">no data loaded</small></div>
+    <div class="seclabel">raw buffer <span id="buffer-n"></span></div>
+    <div class="buffer" id="buffer">
+      <div class="notebox" style="border:none">A small preview renders here —
+        the full data stays in local memory. Double-click a cell to edit.</div>
+    </div>
+    <div class="seclabel">issue density by column</div>
+    <div class="entropy" id="entropy" title="teal = clean, yellow = issues"></div>
+    <div class="seclabel">selected column</div>
+    <div id="colstats"><div class="notebox">click a column in the raw buffer
+      or an issue card</div></div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span class="lit">
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+         style="vertical-align:-1px">
+      <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    secure offline status: active</span>
+  <span id="pii-status"></span>
+  <div class="grow"></div>
+  <span id="status-text">no file loaded</span>
+</div>
+
+<div class="modal hidden" id="modal">
+  <div class="inner">
+    <header style="border:none;border-bottom:1px solid var(--border)">
+      <div class="logo" style="font-size:.8rem">cleaning report</div>
+      <div class="grow"></div>
+      <button class="ghost small" id="modal-close" aria-label="Close">&#10005;</button></header>
+    <pre id="modal-pre"></pre>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const state = {grid:null, issues:[], suggestions:[], selectedCol:null,
+               busy:false, verdicts:[], appliedAny:false};
+
+/* ---------- helpers ---------- */
+async function api(url, opts){
+  const r = await fetch(url, opts);
+  if(!r.ok){const d = await r.json().catch(()=>({detail:r.statusText}));
+            throw new Error(d.detail || r.statusText);}
+  return r;
+}
+function toast(msg){
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg; t.setAttribute("role","status");
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 3600);
+}
+function esc(s){const d=document.createElement("span");d.textContent=s;return d.innerHTML;}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav.tabs button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("nav.tabs button").forEach(x=>{
+      x.classList.toggle("active", x===b);
+      x.setAttribute("aria-selected", x===b);
+    });
+    ["pipeline","recipes","exports"].forEach(t=>
+      $("#tab-"+t).classList.toggle("hidden", b.dataset.tab!==t));
+    if(b.dataset.tab==="exports" && state.grid) loadPII();
+  });
+});
+
+/* ---------- installed models ---------- */
+(async ()=>{
+  try{
+    const d = await (await fetch("/api/models")).json();
+    if(d.models.length)
+      $("#model").innerHTML = d.models.map(m=>
+        `<option value="${esc(m)}"${m==="qwen3.5:4b"?" selected":""}>${esc(m)}</option>`).join("");
+  }catch(e){}
+})();
+
+/* ---------- upload ---------- */
+const drop = $("#drop"), fileInput = $("#file");
+drop.addEventListener("click", ()=>fileInput.click());
+drop.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fileInput.click();}});
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop", e=>{if(e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]);});
+fileInput.addEventListener("change", ()=>{if(fileInput.files[0]) upload(fileInput.files[0]);});
+
+async function upload(file){
+  $("#status-text").textContent = "profiling " + file.name + " …";
+  try{
+    const fd = new FormData(); fd.append("file", file);
+    const d = await (await api("/api/upload",{method:"POST",body:fd})).json();
+    state.grid = d.grid; state.issues = d.issues; state.verdicts = [];
+    state.suggestions = []; state.selectedCol = null; state.appliedAny = false;
+    $("#filechip").textContent = `${d.name} (${d.n_rows} rows)`;
+    ["#filechip","#btn-new"].forEach(s=>$(s).classList.remove("hidden"));
+    $("#btn-undo").classList.add("hidden");
+    $("#empty").classList.add("hidden");
+    $("#pipeline").classList.remove("hidden");
+    $("#solutions").classList.add("hidden");
+    $("#verify-box").classList.add("hidden");
+    $("#intel-sub").textContent = `${d.n_rows} rows × ${d.n_cols} cols in local memory`;
+    $("#analysis-sub").textContent =
+      `${d.issues.length} issue signal(s) detected by the profiler — no AI involved yet`;
+    renderIssueCards(); renderBuffer(); renderEntropy(); loadTimeline(); loadPII();
+    $("#status-text").textContent =
+      `${d.n_rows} rows · ${d.n_cols} columns · ${d.issues.length} issue signals`;
+  }catch(e){ $("#status-text").textContent = "error"; toast("Upload failed: "+e.message); }
+}
+$("#btn-new").addEventListener("click", ()=>location.reload());
+
+/* ---------- issue cards ---------- */
+function renderIssueCards(){
+  const box = $("#issue-cards");
+  if(!state.issues.length){
+    box.innerHTML = `<div class="notebox">profiler found nothing suspicious —
+      you can still ask the agent below</div>`;
+    return;
+  }
+  box.innerHTML = state.issues.map((i,idx)=>`
+    <div class="card${state.selectedCol && i.col===state.selectedCol ? " active":""}"
+         data-i="${idx}" tabindex="0" role="button"
+         aria-label="${esc(i.issue)} in ${esc(i.col??'whole table')}">
+      <div style="display:flex;align-items:baseline;gap:.5rem">
+        <span class="k">issue</span><span class="n">${esc(String(i.count))}</span></div>
+      <div class="t">${esc(i.issue)}</div>
+      <div class="colname">${i.col?esc(i.col):"whole table"}</div>
+    </div>`).join("");
+  box.querySelectorAll(".card").forEach(c=>{
+    const pick = ()=>{
+      const iss = state.issues[+c.dataset.i];
+      state.selectedCol = iss.col || null;
+      $("#scope-note").textContent = iss.col ? `scope: ${iss.col}` : "scope: whole table";
+      renderIssueCards();
+      if(iss.col) loadColStats(iss.col);
+      highlightBufferCol(); renderDataView();
+    };
+    c.addEventListener("click", pick);
+    c.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
+  });
+}
+
+/* ---------- data view (excel-style top preview, 10/50 rows) ---------- */
+let previewN = 10;
+document.querySelectorAll(".rowbtns button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    previewN = +b.dataset.rows;
+    document.querySelectorAll(".rowbtns button").forEach(x=>
+      x.classList.toggle("active", x===b));
+    renderDataView();
+  });
+});
+function issueCount(col){ return state.issues.filter(i=>i.col===col).length; }
+function renderDataView(){
+  const g = state.grid, box = $("#dataview");
+  if(!g) return;
+  if(previewN === 0){
+    box.classList.add("hidden");
+    $("#view-note").textContent = "";
+    return;
+  }
+  box.classList.remove("hidden");
+  const changed = g.changed||{}, newCols = new Set(g.new_cols||[]);
+  let html = "<table><thead><tr><th style='cursor:default'></th>";
+  g.columns.forEach(c=>{
+    const n = issueCount(c);
+    const cls = [c===state.selectedCol?"selected":"", newCols.has(c)?"newcol":""].join(" ");
+    html += `<th class="${cls}" data-col="${esc(c)}" tabindex="0" role="button"
+      aria-label="Column ${esc(c)}${n?`, ${n} issues`:""}">${esc(c)}${
+      n?`<span class="cnt">${n}</span>`:""}</th>`;
+  });
+  html += "</tr></thead><tbody>";
+  g.rows.slice(0, previewN).forEach(r=>{
+    html += `<tr data-rid="${r.rid}"><td class="rownum">${r.rid+1}</td>`;
+    r.cells.forEach((v,ci)=>{
+      const col = g.columns[ci];
+      const isCh = (changed[col]||[]).includes(r.rid);
+      const cls = newCols.has(col) ? "newcell" : isCh ? "changed" : "";
+      const was = isCh ? g.before?.[col]?.[String(r.rid)] : undefined;
+      html += `<td class="${cls}" data-c="${ci}"
+        title="${esc(was!==undefined?`was: ${was||"(empty)"}`:v)}">${esc(v)}</td>`;
+    });
+    html += "</tr>";
+  });
+  html += "</tbody></table>";
+  box.innerHTML = html;
+  $("#view-note").textContent =
+    ` — first ${Math.min(previewN, g.rows.length)} of ${g.n_total_rows} rows`;
+  box.querySelectorAll("th[data-col]").forEach(th=>{
+    const pick = ()=>{
+      state.selectedCol = th.dataset.col;
+      $("#scope-note").textContent = `scope: ${th.dataset.col}`;
+      loadColStats(th.dataset.col); renderIssueCards();
+      renderDataView(); highlightBufferCol();
+    };
+    th.addEventListener("click", pick);
+    th.addEventListener("keydown", e=>{
+      if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
+  });
+  box.querySelectorAll("td[data-c]").forEach(td=>
+    td.addEventListener("dblclick", ()=>editCellInline(td)));
+}
+
+/* ---------- raw buffer (small preview) ---------- */
+const BUFFER_ROWS = 8;
+function renderBuffer(){
+  const g = state.grid, box = $("#buffer");
+  if(!g){ return; }
+  const changed = g.changed||{}, newCols = new Set(g.new_cols||[]);
+  const cols = g.columns;
+  let html = "<table><thead><tr>";
+  cols.forEach(c=>html += `<th data-col="${esc(c)}" title="${esc(c)}"
+      class="${c===state.selectedCol?"selected":""}">${esc(c)}</th>`);
+  html += "</tr></thead><tbody>";
+  g.rows.slice(0, BUFFER_ROWS).forEach(r=>{
+    html += `<tr data-rid="${r.rid}">`;
+    r.cells.forEach((v,ci)=>{
+      const col = cols[ci];
+      const isCh = (changed[col]||[]).includes(r.rid);
+      const cls = newCols.has(col) ? "newcell" : isCh ? "changed" : "";
+      const was = isCh ? g.before?.[col]?.[String(r.rid)] : undefined;
+      html += `<td class="${cls}" data-c="${ci}"
+        title="${esc(was!==undefined?`was: ${was||"(empty)"}`:v)}">${esc(v)}</td>`;
+    });
+    html += "</tr>";
+  });
+  html += "</tbody></table>";
+  box.innerHTML = html;
+  $("#buffer-n").textContent = `(head ${Math.min(BUFFER_ROWS, g.rows.length)} of ${g.n_total_rows})`;
+  box.querySelectorAll("th").forEach(th=>{
+    th.addEventListener("click", ()=>{
+      state.selectedCol = th.dataset.col;
+      $("#scope-note").textContent = `scope: ${th.dataset.col}`;
+      loadColStats(th.dataset.col); renderIssueCards(); highlightBufferCol();
+    });
+  });
+  box.querySelectorAll("td").forEach(td=>{
+    td.addEventListener("dblclick", ()=>editCellInline(td));
+  });
+  renderDataView();
+}
+function highlightBufferCol(){
+  document.querySelectorAll("#buffer th").forEach(th=>
+    th.classList.toggle("selected", th.dataset.col===state.selectedCol));
+}
+let editing = false;
+function editCellInline(td){
+  if(editing) return; editing = true;
+  const rid = +td.closest("tr").dataset.rid;
+  const col = state.grid.columns[+td.dataset.c];
+  const old = td.textContent;
+  td.innerHTML = `<input type="text" value="${esc(old)}" aria-label="Edit ${esc(col)}">`;
+  const inp = td.querySelector("input"); inp.focus(); inp.select();
+  const done = async commit=>{
+    if(!editing) return; editing = false;
+    const v = inp.value; td.textContent = old;
+    if(commit && v!==old){
+      try{
+        const d = await (await api("/api/edit",{method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({op:"cell", rid, col, value:v})})).json();
+        state.grid = d.grid; state.appliedAny = true;
+        renderBuffer(); loadTimeline();
+        $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+        toast(`edited ${col} — Ctrl+Z to undo`);
+      }catch(e){ toast("Edit failed: "+e.message); }
+    }
+  };
+  inp.addEventListener("keydown", e=>{
+    if(e.key==="Enter") done(true);
+    else if(e.key==="Escape") done(false);
+    e.stopPropagation();
+  });
+  inp.addEventListener("blur", ()=>done(true));
+}
+
+/* ---------- entropy map: issue density per column ---------- */
+function renderEntropy(){
+  const box = $("#entropy");
+  if(!state.grid){ box.innerHTML=""; return; }
+  const perCol = {};
+  state.issues.forEach(i=>{ if(i.col) perCol[i.col] = (perCol[i.col]||0)+1; });
+  box.innerHTML = state.grid.columns.map(c=>{
+    const n = perCol[c]||0;
+    const color = n===0 ? "var(--accent-dim)" : n===1 ? "var(--warn-dim)" : "var(--warn)";
+    const solid = n===0 ? "rgba(60,221,199,.45)" : color;
+    return `<i style="background:${solid}" title="${esc(c)}: ${n} issue(s)"></i>`;
+  }).join("");
+}
+
+/* ---------- column stats ---------- */
+async function loadColStats(col){
+  try{
+    const d = await (await api("/api/colstats?col="+encodeURIComponent(col))).json();
+    let html = `<div class="micro" style="color:var(--accent-2);margin-bottom:.4rem">${esc(col)}</div>
+      <div class="stat-tiles">
+      <span><b>dtype</b>${esc(d.dtype)}</span><span><b>rows</b>${d.n}</span>
+      <span><b>unique</b>${d.unique}</span>
+      <span><b>nulls</b><span style="${d.nulls?'color:var(--warn)':''}">${d.nulls}</span></span>`;
+    if(d.numeric) html += `<span><b>min</b>${d.numeric.min}</span>
+      <span><b>mean</b>${d.numeric.mean}</span><span><b>max</b>${d.numeric.max}</span>`;
+    html += `</div>`;
+    const bars = d.histogram || d.top_values;
+    if(bars && bars.length){
+      const max = Math.max(...bars.map(b=>b.n));
+      html += `<div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.5rem">` +
+        bars.map(b=>`<div class="bar-row">
+        <span class="lbl" title="${esc(b.label??b.value)}">${esc(b.label??b.value)}</span>
+        <span class="track"><span class="fill" style="width:${Math.max(2,100*b.n/max)}%"></span></span>
+        <span class="n">${b.n}</span></div>`).join("") + "</div>";
+    }
+    $("#colstats").innerHTML = html;
+  }catch(e){}
+}
+
+/* ---------- suggest (action words + cancel) ---------- */
+const ACTIONS = ["reading column statistics…","scanning format signatures…",
+  "consulting the local model…","weighing tool options…","drafting repair steps…",
+  "validating JSON against schema…","double-checking column names…"];
+let actionTimer = null, suggestAbort = null;
+function startThinking(){
+  $("#think").classList.remove("hidden");
+  let i = 0; $("#think-word").textContent = ACTIONS[0];
+  actionTimer = setInterval(()=>{i=(i+1)%ACTIONS.length;
+    $("#think-word").textContent = ACTIONS[i];}, 1800);
+}
+function stopThinking(){ clearInterval(actionTimer); $("#think").classList.add("hidden"); }
+
+$("#btn-suggest").addEventListener("click", suggest);
+$("#hintchips").addEventListener("click", e=>{
+  const chip = e.target.closest(".chip");
+  if(!chip) return;
+  const box = $("#instruction");
+  box.value = chip.textContent;
+  box.focus();
+});
+$("#instruction").addEventListener("keydown", e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==="Enter"){ e.preventDefault(); suggest(); }});
+
+async function suggest(){
+  if(state.busy || !state.grid) return; state.busy = true;
+  $("#sugg-error").innerHTML = ""; $("#sugg-box").innerHTML = "";
+  $("#solutions").classList.add("hidden");
+  $("#btn-suggest").disabled = true; startThinking();
+  suggestAbort = new AbortController();
+  $("#btn-cancel").onclick = ()=>suggestAbort.abort();
+  try{
+    const d = await (await api("/api/plan",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      signal: suggestAbort.signal,
+      body:JSON.stringify({model:$("#model").value, col:state.selectedCol,
+                           instruction:$("#instruction").value.trim()})})).json();
+    state.suggestions = d.steps;
+    const src = d.outcome.source==="fallback_rule_based"
+      ? "model failed — deterministic fallback"
+      : `${$("#model").value} · valid in ${d.outcome.attempts} attempt(s)`;
+    renderSuggestions(src);
+  }catch(e){
+    if(e.name==="AbortError") toast("Cancelled — no changes were made");
+    else $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`;
+  }
+  suggestAbort = null;
+  stopThinking(); $("#btn-suggest").disabled = false; state.busy = false;
+}
+
+function renderSuggestions(src){
+  const box = $("#sugg-box");
+  $("#solutions").classList.remove("hidden");
+  if(!state.suggestions.length){
+    box.innerHTML = `<div class="notebox">the agent proposes no changes here</div>`;
+    return;
+  }
+  let html = `<div class="micro">${esc(src)}</div>`;
+  state.suggestions.forEach((s,i)=>{
+    const params = Object.keys(s.params||{}).length ? JSON.stringify(s.params) : "";
+    html += `
+      <div class="suggestion on" data-i="${i}" tabindex="0" role="checkbox"
+           aria-checked="true" aria-label="Approve: ${esc(s.tool)} on ${esc(s.col??'whole table')}">
+        <span class="tick" aria-hidden="true">&#10003;</span>
+        <div class="grow">
+          <div><span class="tool">${esc(s.tool)}</span>
+               <span class="on-col">(${esc(s.col??"whole table")})</span>
+               ${params?`<span class="micro" style="color:var(--warn)">${esc(params)}</span>`:""}</div>
+          <div class="why">${esc(s.reason||"")}</div>
+        </div>
+      </div>`;
+  });
+  html += `<button class="primary" id="btn-approve">Approve &amp; execute</button>
+    <div class="notebox">only selected cards run — deterministic pandas executes;
+    the model never touches your rows</div>`;
+  box.innerHTML = html;
+  box.querySelectorAll(".suggestion").forEach(card=>{
+    const flip = ()=>{card.classList.toggle("on");
+      card.setAttribute("aria-checked", card.classList.contains("on"));};
+    card.addEventListener("click", flip);
+    card.addEventListener("keydown", e=>{
+      if(e.key===" "||e.key==="Enter"){e.preventDefault();flip();}});
+  });
+  $("#btn-approve").addEventListener("click", applyApproved);
+}
+
+async function applyApproved(){
+  if(state.busy) return;
+  const steps = [...document.querySelectorAll("#sugg-box .suggestion.on")]
+    .map(el=>state.suggestions[+el.dataset.i]);
+  if(!steps.length){ toast("No steps selected."); return; }
+  state.busy = true;
+  const btn = $("#btn-approve"); btn.disabled = true; btn.textContent = "Executing…";
+  try{
+    const d = await (await api("/api/execute",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({steps})})).json();
+    handleExecuted(d, steps.length);
+  }catch(e){ $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  state.busy = false;
+}
+
+function showEncodeLegend(entries){
+  state.encodes = entries;
+  $("#encode-legend").innerHTML = entries.map(a=>{
+    const pairs = Object.entries(a.mapping);
+    const shown = pairs.slice(0, 14)
+      .map(([v,c])=>`${esc(v)} = <b>${c}</b>`).join(" &middot; ");
+    const more = pairs.length > 14 ? ` &middot; &hellip;${pairs.length-14} more` : "";
+    return `<div><b>${esc(a.target||a.col)}</b>: ${shown}${more}</div>`;
+  }).join("");
+  $("#encode-box").classList.remove("hidden");
+}
+
+$("#btn-decode").addEventListener("click", async ()=>{
+  if(!state.encodes?.length || state.busy) return;
+  // Decode = apply the inverse mapping (code -> original value) through the
+  // normal execute path, so it lands in the audit log and is undoable.
+  const steps = state.encodes.map(a=>({tool:"standardize_categories",
+    col:a.target||a.col,
+    params:{mapping:Object.fromEntries(
+      Object.entries(a.mapping).map(([v,c])=>[String(c), v]))},
+    reason:"decode label codes back to original values"}));
+  state.busy = true;
+  try{
+    const d = await (await api("/api/execute",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({steps})})).json();
+    state.encodes = []; $("#encode-box").classList.add("hidden");
+    handleExecuted(d, steps.length);
+  }catch(e){ toast("Decode failed: "+e.message); }
+  state.busy = false;
+});
+
+function handleExecuted(d, nSteps){
+  state.grid = d.grid; state.verdicts = d.verdicts; state.appliedAny = true;
+  const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
+  const removed = d.grid.removed_rids.length;
+  $("#filechip").textContent = $("#filechip").textContent
+      .replace(/\(\d+ rows\)/, `(${d.n_rows_after} rows)`);
+  $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+  $("#status-text").textContent =
+    `round ${d.round} — ${changed} cells changed, ${removed} duplicate rows removed, `+
+    `${d.n_rows_after} rows remain`;
+  toast(`Applied ${nSteps} step(s) — ${changed} cells changed`);
+  // refresh issue cards from verdicts that resolved
+  state.issues = state.issues.filter(i=>{
+    const v = d.verdicts.find(v=>v.col===i.col || (!v.col && !i.col));
+    return !(v && ["resolved","flagged"].includes(v.verdict));
+  });
+  renderIssueCards(); renderBuffer(); renderEntropy(); loadTimeline();
+  renderVerdicts();
+  // encoding legend: surface the value=code mapping of any encode step
+  const enc = (d.audit||[]).filter(a=>a.tool==="encode_categories"
+                                      && a.mapping && a.status==="ok");
+  if(enc.length) showEncodeLegend(enc);
+  state.suggestions = d.followup || [];
+  if(state.suggestions.length)
+    renderSuggestions("verifier follow-up — issues survived round "+d.round);
+  else $("#sugg-box").innerHTML =
+    `<div class="notebox">nothing left for the agent — see verification below</div>`;
+}
+
+function renderVerdicts(){
+  if(!state.verdicts.length){ $("#verify-box").classList.add("hidden"); return; }
+  $("#verify-box").classList.remove("hidden");
+  const order = {unresolved:0,new_issue:0,partially_resolved:1,flagged:2,resolved:3};
+  $("#verdicts").innerHTML = [...state.verdicts]
+    .sort((a,b)=>(order[a.verdict]??9)-(order[b.verdict]??9)).map(v=>
+    `<div class="verdict"><span>${esc(v.issue)}
+       <span style="color:var(--accent-2)">${esc(v.col??"whole table")}</span></span>
+     <span class="v-${v.verdict}">${esc(v.verdict.replaceAll("_"," "))}
+       ${esc(String(v.before))}&rarr;${esc(String(v.after))}</span></div>`).join("");
+}
+
+/* ---------- timeline + versions ---------- */
+async function loadTimeline(){
+  try{
+    const h = await (await api("/api/history")).json();
+    $("#timeline").innerHTML = [...h.timeline].reverse().map((e,idx)=>`
+      <div class="tl-item k-${esc(e.kind)}">
+        <span class="dot" aria-hidden="true"></span>
+        <div class="grow"><div class="lbl">${esc(e.label)}</div>
+          <div class="when">${esc(e.ts.slice(11,16))} · ${e.n_rows} rows</div></div>
+        ${idx===0 ? `<span class="micro" style="color:var(--ok)">now</span>`
+          : `<button class="ghost small" data-revert="${e.id}">
+             ${e.id===0?"origin":"revert"}</button>`}
+      </div>`).join("");
+    document.querySelectorAll("[data-revert]").forEach(b=>
+      b.addEventListener("click", ()=>revertTo(+b.dataset.revert)));
+    renderVersions(h.versions);
+  }catch(e){}
+}
+function renderVersions(versions){
+  const box = $("#versions");
+  box.innerHTML = versions.length ? versions.map(v=>`
+    <div class="ver-row"><span class="nm">${esc(v.name)}</span>
+      <span class="micro">${v.n_rows}r</span><div class="grow"></div>
+      <a href="/api/download?version=${encodeURIComponent(v.name)}" download>
+        <button class="ghost small">dl</button></a>
+      <button class="ghost small" data-restore="${esc(v.name)}">restore</button>
+    </div>`).join("")
+    : `<div class="notebox">none yet</div>`;
+  box.querySelectorAll("[data-restore]").forEach(b=>
+    b.addEventListener("click", async ()=>{
+      try{
+        const d = await (await api("/api/version/restore",{method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({name:b.dataset.restore})})).json();
+        afterStateChange(d, `restored '${b.dataset.restore}'`);
+      }catch(e){ toast(e.message); }
+    }));
+}
+async function revertTo(id){
+  try{
+    const d = await (await api("/api/revert",{method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({id})})).json();
+    afterStateChange(d, id===0 ? "reverted to the original file" : "reverted");
+  }catch(e){ toast(e.message); }
+}
+function afterStateChange(d, msg){
+  state.grid = d.grid; state.appliedAny = true;
+  $("#filechip").textContent = $("#filechip").textContent
+      .replace(/\(\d+ rows\)/, `(${d.n_rows} rows)`);
+  $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+  renderBuffer(); renderEntropy(); loadTimeline();
+  toast(msg + " — Ctrl+Z to step back");
+}
+$("#btn-save-version").addEventListener("click", async ()=>{
+  const name = $("#version-name").value.trim();
+  if(!name){ toast("Give the version a name first."); return; }
+  if(!state.grid){ toast("Load a file first."); return; }
+  try{
+    const d = await (await api("/api/version",{method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({name})})).json();
+    $("#version-name").value = ""; renderVersions(d.versions);
+    toast(`version '${name}' saved`);
+  }catch(e){ toast(e.message); }
+});
+$("#version-name").addEventListener("keydown", e=>{
+  if(e.key==="Enter") $("#btn-save-version").click(); });
+
+/* ---------- undo ---------- */
+async function doUndo(){
+  try{
+    const d = await (await api("/api/undo",{method:"POST"})).json();
+    state.grid = d.grid;
+    $("#filechip").textContent = $("#filechip").textContent
+        .replace(/\(\d+ rows\)/, `(${d.n_rows} rows)`);
+    $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
+    renderBuffer(); renderEntropy(); loadTimeline();
+    toast(d.undo_depth ? `undone (${d.undo_depth} more)` : "undone — history empty");
+  }catch(e){ toast(e.message); }
+}
+$("#btn-undo").addEventListener("click", doUndo);
+document.addEventListener("keydown", e=>{
+  if(editing || e.target.matches("input,textarea,select")) return;
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z"){ e.preventDefault(); doUndo(); }
+  if(e.key==="Escape") $("#modal").classList.add("hidden");
+});
+
+/* ---------- recipes ---------- */
+$("#btn-save-recipe").addEventListener("click", async ()=>{
+  try{
+    const d = await (await api("/api/recipe")).json();
+    const blob = new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "yoda_recipe.json";
+    a.click(); URL.revokeObjectURL(a.href);
+    $("#recipe-info").textContent = `saved ${d.steps.length} step(s) — replay with: yoda clean file.csv --recipe yoda_recipe.json`;
+  }catch(e){ toast(e.message); }
+});
+$("#btn-apply-recipe").addEventListener("click", ()=>$("#recipe-file").click());
+$("#recipe-file").addEventListener("change", async ()=>{
+  const f = $("#recipe-file").files[0]; $("#recipe-file").value = "";
+  if(!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    const steps = Array.isArray(data) ? data : data.steps;
+    if(!steps?.length) throw new Error("no steps in this recipe");
+    const d = await (await api("/api/execute",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({steps})})).json();
+    document.querySelector('[data-tab="pipeline"]').click();
+    handleExecuted(d, steps.length);
+  }catch(e){ toast("Recipe failed: "+e.message); }
+});
+
+/* ---------- exports: pii + report ---------- */
+async function loadPII(){
+  try{
+    const d = await (await api("/api/scan")).json();
+    const s = d.summary;
+    $("#pii-status").textContent =
+      `pii: ${s.n_columns_with_pii}/${s.n_columns_scanned} cols · risk ${s.highest_risk}`;
+    $("#pii-box").innerHTML = d.columns.length ? d.columns.map(f=>{
+      const det = Object.entries(f.detected).map(([k,v])=>`${k}×${v}`).join(", ") || "—";
+      const c = {high:"var(--danger)",medium:"var(--warn)",low:"var(--ok)"}[f.risk];
+      return `<div class="verdict"><span>${esc(f.col)}
+        <span class="micro">${esc(det)}</span></span>
+        <span style="color:${c}">${f.risk}</span></div>`;
+    }).join("") : `<div class="notebox">no PII detected</div>`;
+  }catch(e){}
+}
+$("#btn-report").addEventListener("click", async ()=>{
+  try{
+    const md = await (await api("/api/report")).text();
+    const pre = $("#report-pre"); pre.textContent = md;
+    pre.classList.remove("hidden");
+  }catch(e){ toast(e.message); }
+});
+$("#modal-close").addEventListener("click", ()=>$("#modal").classList.add("hidden"));
+</script>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+/* ---- YODA browser demo: route api() into Pyodide instead of fetch ---- */
+let _dispatch = null;
+const _pyReady = (async ()=>{
+  const say = t => { const s = document.getElementById("demo-status");
+                     if(s) s.textContent = t; };
+  try{
+    say("loading Python runtime…");
+    const py = await loadPyodide();
+    say("loading pandas (~15 MB, cached after first visit)…");
+    await py.loadPackage(["pandas","openpyxl","pyyaml","micropip"]);
+    say("installing YODA…");
+    const wheel = document.querySelector('meta[name="demo-wheel"]').content;
+    await py.runPythonAsync(`
+import micropip
+await micropip.install(["python-dateutil","jsonschema"])
+await micropip.install("${new URL(wheel, location.href).href}", deps=False)
+`);
+    const shim = await (await fetch("demo_shim.py")).text();
+    py.FS.writeFile("demo_shim.py", shim);
+    await py.runPythonAsync("import demo_shim");
+    _dispatch = py.pyimport("demo_shim").dispatch;
+    say("ready — load a file or use the sample.");
+    const b = document.getElementById("btn-sample");
+    b.disabled = false;
+    setTimeout(()=>{ const s=document.getElementById("demo-status");
+                     if(s) s.textContent=""; }, 6000);
+    return py;
+  }catch(err){ say("demo failed to load: " + err.message); throw err; }
+})();
+
+window.api = async function(url, opts={}){
+  await _pyReady;
+  const u = new URL(url, location.href);
+  const path = "/api/" + u.pathname.split("/api/").pop();
+  const query = Object.fromEntries(u.searchParams.entries());
+  const method = (opts.method || "GET").toUpperCase();
+  let bodyJson = "null", fileName = "", fileBytes = null;
+  if(opts.body instanceof FormData){
+    const f = opts.body.get("file");
+    fileName = f.name;
+    fileBytes = new Uint8Array(await f.arrayBuffer());
+  }else if(typeof opts.body === "string"){ bodyJson = opts.body; }
+  const proxy = await _dispatch(method, path, JSON.stringify(query),
+                                bodyJson, fileName, fileBytes);
+  const res = proxy.toJs({dict_converter: Object.fromEntries});
+  proxy.destroy();
+  if(res.status >= 400){
+    let detail = "error";
+    try{ detail = JSON.parse(res.data).detail; }catch(_e){}
+    throw new Error(detail);
+  }
+  return {
+    ok: true,
+    json: async ()=> JSON.parse(res.data),
+    text: async ()=> res.data,
+    blob: async ()=> new Blob([res.data],
+      {type: res.media_type || "application/octet-stream"}),
+    _demo: res,
+  };
+};
+
+/* download links (<a href="/api/download…">) -> in-browser blob downloads */
+document.addEventListener("click", async e=>{
+  const a = e.target.closest('a[href^="/api/"]');
+  if(!a) return;
+  e.preventDefault();
+  try{
+    const r = await api(a.getAttribute("href"));
+    const url = URL.createObjectURL(await r.blob());
+    const tmp = document.createElement("a");
+    tmp.href = url; tmp.download = r._demo.filename || "download";
+    document.body.appendChild(tmp); tmp.click(); tmp.remove();
+    URL.revokeObjectURL(url);
+  }catch(err){ if(typeof toast === "function") toast(err.message); }
+}, true);
+
+/* sample data button */
+document.getElementById("btn-sample").addEventListener("click", async ()=>{
+  const blob = await (await fetch("sample_messy.csv")).blob();
+  upload(new File([blob], "sample_messy.csv", {type: "text/csv"}));
+});
+</script>
+
+</body>
+</html>

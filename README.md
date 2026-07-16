@@ -4,6 +4,12 @@
 > single raw row and **nothing leaves your machine**. The demo runs with
 > Wi-Fi off.
 
+**▶ [Try the live browser demo](https://zeref538.github.io/yoda/demo/)** — the
+whole pipeline (profiler → planner → human gate → executor → verifier) runs in
+*your* browser via WebAssembly; files you load never leave your machine. The
+demo uses the deterministic rule-based planner (the AI planner needs a local
+Ollama install).
+
 **Headline result:** on a ground-truth benchmark of **1,589 labeled errors**
 across 6 datasets, YODA's agent (qwen3.5:4b, ~3.4 GB, runs on a laptop) reaches
 **94.3% detection / 94.8% fix rate with a 0.00% false-fix rate** — it never
