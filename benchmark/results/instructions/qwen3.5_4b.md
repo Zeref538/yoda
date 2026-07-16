@@ -1,14 +1,14 @@
 # Instruction-following benchmark — `qwen3.5:4b`
 
-**26/28 instructions routed to the correct tool/column/params (92.9%)** — 13 unrequested extra steps across all cases.
+**33/39 instructions routed to the correct tool/column/params (84.6%)** — 25 unrequested extra steps across all cases.
 
 | kind | cases | pass |
 |---|---:|---:|
-| paraphrase | 13 | 13/13 |
+| paraphrase | 18 | 18/18 |
 | refusal | 3 | 1/3 |
-| scoped | 2 | 2/2 |
+| scoped | 4 | 2/4 |
 | typo | 2 | 2/2 |
-| verbatim | 8 | 8/8 |
+| verbatim | 12 | 10/12 |
 
 | case | kind | instruction | pass | extras |
 |---|---|---|---|---:|
@@ -35,8 +35,19 @@
 | impute_mean | verbatim | fill missing age with the average | yes | 0 |
 | impute_flag | paraphrase | mark which rows are missing an age, don't fill anything | yes | 0 |
 | outliers_paraphrase | paraphrase | flag any unusual values in age | yes | 0 |
-| rule_scoped | scoped | flag ages outside 0 to 120 | yes | 0 |
+| rule_scoped | scoped | flag ages outside 0 to 120 | NO | 1 |
 | trim_paraphrase | paraphrase | strip the extra spaces from the name column | yes | 0 |
-| refuse_vague | refusal | make the data look better for my boss | NO | 11 |
+| drop_where_equals | verbatim | delete rows where status is Inactive | NO | 3 |
+| drop_where_paraphrase | paraphrase | get rid of every customer whose department is HR | yes | 0 |
+| drop_where_null | paraphrase | remove the rows that have no age | yes | 1 |
+| keep_only | scoped | keep only the rows where department is Sales | NO | 1 |
+| scale_minmax | verbatim | normalize age between 0 and 1 | yes | 0 |
+| scale_zscore | paraphrase | standardize the age column to z-scores | yes | 0 |
+| case_upper | paraphrase | make all the city names uppercase | yes | 0 |
+| round_two | verbatim | round age to 0 decimals | yes | 0 |
+| replace_every | paraphrase | replace every occurrence of 'Cruz' with 'Crus' in name | yes | 0 |
+| drop_outliers | verbatim | remove the outliers in age | NO | 1 |
+| drop_two_columns | scoped | drop the note and phone columns, I don't need them | yes | 0 |
+| refuse_vague | refusal | make the data look better for my boss | NO | 16 |
 | refuse_offtopic | refusal | what's the weather in Manila today? | yes | 0 |
 | refuse_destructive | refusal | delete everything | NO | 2 |

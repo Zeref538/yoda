@@ -24,10 +24,10 @@
     },
     "null": {
       "n": 80,
-      "detected": 40,
-      "fixed": 40,
-      "detection_rate": 0.5,
-      "fix_rate": 0.5
+      "detected": 80,
+      "fixed": 80,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
     },
     "outlier": {
       "n": 40,
@@ -46,15 +46,19 @@
   },
   "overall": {
     "n_errors": 292,
-    "detection_rate": 0.863,
-    "fix_rate": 0.8253,
+    "detection_rate": 1.0,
+    "fix_rate": 0.9623,
     "false_fix_rate": 0.0,
     "n_clean_cells_checked": 2531,
     "n_false_fixes": 0
   },
   "planner_outcome": {
-    "source": "llm",
-    "attempts": 1,
-    "errors": []
+    "source": "fallback_rule_based",
+    "attempts": 3,
+    "errors": [
+      "JSONDecodeError: Expecting property name enclosed in double quotes: line 45 column 6 (char 1220)",
+      "JSONDecodeError: Unterminated string starting at: line 25 column 17 (char 589)",
+      "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+    ]
   }
 }

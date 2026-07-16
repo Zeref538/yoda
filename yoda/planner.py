@@ -25,8 +25,15 @@ TOOL_NAMES = [
     "standardize_categories", "fix_dtypes", "impute_missing", "flag_outliers",
     "trim_whitespace", "validate_rule", "rename_columns",
     "drop_blank_rows", "drop_blank_columns", "replace_values",
-    "encode_categories",
+    "encode_categories", "drop_rows_where", "scale_numeric",
+    "format_text", "round_numbers",
 ]
+
+# Tools (or tool modes) that delete or transform data with no profile signal
+# demanding it. Allowed ONLY when a human asked / approved — never proposed
+# autonomously. (Recoverable regardless: the executor keeps the original df.)
+INSTRUCTION_ONLY_TOOLS = {"drop_rows_where", "scale_numeric",
+                          "format_text", "round_numbers"}
 
 PLAN_SCHEMA = {
     "type": "object",
@@ -84,6 +91,15 @@ Available tools (col = column to act on, null for whole-table tools):
 - encode_categories(col, params={"start": 1}) — label-encode: map each distinct
   value to an integer (1,2,3,4...). Use when the user asks to turn categories
   into numbers / number them by category / assign codes per unique value.
+- drop_rows_where(col, params with ONE of: equals / contains / regex /
+  is_null:true / min+max; plus keep:true to invert, match_case:false) — delete
+  rows matching a condition (or keep only those). ONLY on an explicit user ask.
+- scale_numeric(col, params={"method": "minmax"|"zscore"}) — rescale a numeric
+  column to 0..1 or z-scores. ONLY on an explicit user ask.
+- format_text(col, params={"case": "upper"|"lower"|"title"|"sentence"}) — unify
+  text casing. ONLY on an explicit user ask.
+- round_numbers(col, params={"decimals": 2}) — round numerics. ONLY on an
+  explicit user ask.
 
 Rules: propose a step ONLY when the profile shows evidence for it. Do not invent
 columns. Do not clean what is not dirty — unnecessary changes are penalized.
@@ -99,6 +115,9 @@ fits from the profile. If truly nothing matches, return an empty plan rather tha
 inventing unrelated steps.
 
 Plain-language mapping (match on meaning, these are examples not the only phrasings):
+- "clean everything", "clean the whole table", "fix all the issues", "do a full
+  clean" -> propose EVERY step the profile evidence supports, exactly as the
+  signal -> tool rules above dictate (still flag-only for nulls/outliers).
 - "remove/delete/drop blank|empty rows", "get rid of empty lines" -> drop_blank_rows
 - "remove empty/blank columns" -> drop_blank_columns
 - "delete/drop/remove column X", "I don't need X" -> drop_blank_columns(col=X)
@@ -114,6 +133,22 @@ Plain-language mapping (match on meaning, these are examples not the only phrasi
   -> impute_missing(params={"strategy":"mean|median|mode|constant"}) — an explicit
   user ask is the ONE case where a strategy other than flag_only is allowed.
 - "trim/strip the spaces", "clean up whitespace" -> trim_whitespace
+- "delete/remove rows where X is Y", "drop the inactive customers", "remove rows
+  with missing X" -> drop_rows_where(col=X, params={"equals": "Y"} or
+  {"is_null": true}); "keep only rows where X is Y" -> add "keep": true
+- "remove/delete the outliers in X" -> flag_outliers(col=X,
+  params={"method":"iqr","action":"drop"}) — drop action only when asked;
+  plain "flag the outliers" stays the default flag column.
+- "replace every/all A with B", "change all occurrences of A to B" (inside
+  cells) -> replace_values(params={"find":"A","replace":"B","contains":true});
+  whole-cell replacement omits "contains".
+- "normalize/scale X between 0 and 1" -> scale_numeric(col=X,
+  params={"method":"minmax"}); "standardize X to z-scores" -> method "zscore"
+- "make X uppercase/lowercase/title case", "capitalize the names"
+  -> format_text(col=X, params={"case": ...})
+- "round X to N decimals" -> round_numbers(col=X, params={"decimals": N})
+- "drop/delete columns X and Y" -> drop_blank_columns(col=null,
+  params={"columns": ["X","Y"]})
 
 Tool-choice examples (learn the signal -> tool mapping exactly):
 1. Profile shows: "price": {"currency_like_values": 25, "numeric_as_string": 180}
@@ -137,7 +172,18 @@ Tool-choice examples (learn the signal -> tool mapping exactly):
    -> {"tool": "encode_categories", "col": "department", "params": {},
        "reason": "user asked to label-encode categories as integers"}
    This is an explicit instruction — do it even though no profile signal
-   demands it."""
+   demands it.
+6. Targeted asks answer with EXACTLY the asked step, nothing else:
+   "delete the note column" -> ONE step
+   {"tool": "drop_blank_columns", "col": "note", "params": {}, "reason": "user asked"}
+   "keep only rows where department is Sales" -> ONE step
+   {"tool": "drop_rows_where", "col": "department",
+    "params": {"equals": "Sales", "keep": true}, "reason": "user asked"}
+   ("keep only X" ALWAYS means keep: true — dropping the non-matching rows.)
+   "remove the outliers in age" -> ONE step
+   {"tool": "flag_outliers", "col": "age",
+    "params": {"method": "iqr", "action": "drop"}, "reason": "user asked removal"}
+   (the word remove/delete means action "drop"; plain "flag" means no action)"""
 
 
 class RuleBasedPlanner:
@@ -228,8 +274,9 @@ def validate_plan(plan_obj: dict, profile: dict,
     message suitable for feeding back to the model on retry.
 
     `allow_impute_fill` is True only when a human gave an explicit
-    instruction — the one case where impute strategies other than
-    flag_only are permitted."""
+    instruction (or approved the plan) — the only case where impute fill
+    strategies, row-deleting conditions, and value transforms
+    (INSTRUCTION_ONLY_TOOLS, outlier action="drop") are permitted."""
     jsonschema.validate(plan_obj, PLAN_SCHEMA)
     steps = plan_obj["steps"]
     known = set(profile["columns"])
@@ -237,14 +284,33 @@ def validate_plan(plan_obj: dict, profile: dict,
 
     for i, step in enumerate(steps):
         tool, col = step["tool"], step["col"]
+        if not allow_impute_fill:
+            if tool in INSTRUCTION_ONLY_TOOLS:
+                raise PlanValidationError(
+                    f"step {i}: '{tool}' is only allowed when the user "
+                    "explicitly asks for it")
+            if tool == "flag_outliers" and step["params"].get("action") == "drop":
+                raise PlanValidationError(
+                    f"step {i}: flag_outliers action='drop' is only allowed "
+                    "when the user explicitly asks; default is a flag column")
         if tool == "replace_values" and "find" not in step["params"]:
             raise PlanValidationError(
                 f"step {i}: replace_values requires params.find")
+        if tool == "drop_rows_where" and not (
+                {"equals", "contains", "regex", "is_null", "min", "max"}
+                & set(step["params"])):
+            raise PlanValidationError(
+                f"step {i}: drop_rows_where needs one of equals/contains/"
+                "regex/is_null/min/max in params")
         if tool in ("drop_duplicates", "rename_columns",
                     "drop_blank_rows", "drop_blank_columns"):
             if col is not None and col not in known:
                 raise PlanValidationError(
                     f"step {i}: column '{col}' does not exist in the profile")
+            for c in step["params"].get("columns", []):
+                if c not in known:
+                    raise PlanValidationError(
+                        f"step {i}: column '{c}' does not exist in the profile")
             continue
         if col is None:
             raise PlanValidationError(f"step {i}: tool '{tool}' requires a column")

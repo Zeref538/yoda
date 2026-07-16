@@ -146,6 +146,61 @@ CASES: list[dict] = [
     {"id": "trim_paraphrase", "kind": "paraphrase",
      "instruction": "strip the extra spaces from the name column",
      "expect": [{"tool": "trim_whitespace", "col": "name"}]},
+    # --- conditional row deletion -------------------------------------------
+    {"id": "drop_where_equals", "kind": "verbatim",
+     "instruction": "delete rows where status is Inactive",
+     "expect": [{"tool": "drop_rows_where", "col": "status",
+                 "params": {"equals": "Inactive"}}]},
+    {"id": "drop_where_paraphrase", "kind": "paraphrase",
+     "instruction": "get rid of every customer whose department is HR",
+     "expect": [{"tool": "drop_rows_where", "col": "department",
+                 "params": {"equals": "HR"}}]},
+    {"id": "drop_where_null", "kind": "paraphrase",
+     "instruction": "remove the rows that have no age",
+     "expect": [{"tool": "drop_rows_where", "col": "age",
+                 "params": {"is_null": True}}]},
+    {"id": "keep_only", "kind": "scoped",
+     "instruction": "keep only the rows where department is Sales",
+     "expect": [{"tool": "drop_rows_where", "col": "department",
+                 "params": {"equals": "Sales", "keep": True}}]},
+    # --- transforms ------------------------------------------------------------
+    {"id": "scale_minmax", "kind": "verbatim",
+     "instruction": "normalize age between 0 and 1",
+     "expect": [{"tool": "scale_numeric", "col": "age",
+                 "params": {"method": "minmax"}}]},
+    {"id": "scale_zscore", "kind": "paraphrase",
+     "instruction": "standardize the age column to z-scores",
+     "expect": [{"tool": "scale_numeric", "col": "age",
+                 "params": {"method": "zscore"}}]},
+    {"id": "case_upper", "kind": "paraphrase",
+     "instruction": "make all the city names uppercase",
+     "expect": [{"tool": "format_text", "col": "city",
+                 "params": {"case": "upper"}}]},
+    {"id": "round_two", "kind": "verbatim",
+     "instruction": "round age to 0 decimals",
+     "expect": [{"tool": "round_numbers", "col": "age",
+                 "params": {"decimals": 0}}]},
+    {"id": "replace_every", "kind": "paraphrase",
+     "instruction": "replace every occurrence of 'Cruz' with 'Crus' in name",
+     "expect": [{"tool": "replace_values", "col": "name",
+                 "params": {"find": "Cruz", "replace": "Crus"}}]},
+    {"id": "drop_outliers", "kind": "verbatim",
+     "instruction": "remove the outliers in age",
+     "expect": [{"tool": "flag_outliers", "col": "age",
+                 "params": {"action": "drop"}}]},
+    {"id": "drop_two_columns", "kind": "scoped",
+     "instruction": "drop the note and phone columns, I don't need them",
+     # either one multi-column step or two single-column steps is correct
+     "expect_any": [
+         [{"tool": "drop_blank_columns",
+           "params": {"columns": ["note", "phone"]}}],
+         [{"tool": "drop_blank_columns",
+           "params": {"columns": ["phone", "note"]}}],
+         [{"tool": "drop_blank_columns", "col": "note"},
+          {"tool": "drop_blank_columns", "col": "phone"}],
+         [{"tool": "drop_blank_columns", "params": {"columns": ["note"]}},
+          {"tool": "drop_blank_columns", "params": {"columns": ["phone"]}}],
+     ]},
     # --- should refuse -------------------------------------------------------
     {"id": "refuse_vague", "kind": "refusal",
      "instruction": "make the data look better for my boss",
@@ -164,19 +219,35 @@ def step_matches(expected: dict, step: dict) -> bool:
         return False
     if "col" in expected and step.get("col") != expected["col"]:
         return False
+    sp = step.get("params", {})
     for k, v in expected.get("params", {}).items():
-        if step.get("params", {}).get(k) != v:
-            return False
+        got = sp.get(k)
+        if got == v:
+            continue
+        # A case-insensitive match (match_case=false) satisfies a value
+        # expectation for text-matching params — same rows are hit.
+        if (k in ("equals", "find", "contains") and sp.get("match_case") is False
+                and str(got).lower() == str(v).lower()):
+            continue
+        return False
     return True
 
 
 def score_case(case: dict, steps: list[dict]) -> dict:
     if case.get("expect_empty"):
         return {"pass": len(steps) == 0, "extra_steps": len(steps)}
-    matched = all(any(step_matches(e, s) for s in steps) for e in case["expect"])
-    extras = sum(1 for s in steps
-                 if not any(step_matches(e, s) for e in case["expect"]))
-    return {"pass": matched, "extra_steps": extras}
+    # expect_any: several equally-correct plan shapes; best one wins.
+    alternatives = case.get("expect_any") or [case["expect"]]
+    best = {"pass": False, "extra_steps": len(steps)}
+    for expect in alternatives:
+        matched = all(any(step_matches(e, s) for s in steps) for e in expect)
+        extras = sum(1 for s in steps
+                     if not any(step_matches(e, s) for e in expect))
+        if matched and (not best["pass"] or extras < best["extra_steps"]):
+            best = {"pass": True, "extra_steps": extras}
+        elif not best["pass"]:
+            best["extra_steps"] = min(best["extra_steps"], extras)
+    return best
 
 
 def main() -> None:

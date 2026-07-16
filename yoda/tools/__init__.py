@@ -57,13 +57,17 @@ def drop_blank_rows(df: pd.DataFrame, col: str | None = None, params: dict | Non
 def drop_blank_columns(df: pd.DataFrame, col: str | None = None, params: dict | None = None):
     """Remove columns that are entirely empty (all null / whitespace-only).
 
-    If `col` is given, drop that specific column instead (explicit user ask).
+    If `col` (or params.columns, a list) is given, drop those specific
+    columns instead — an explicit user ask.
     """
-    if col:
-        if col not in df.columns:
-            raise ValueError(f"column '{col}' does not exist")
-        out = df.drop(columns=[col])
-        return out, {"rows_affected": 0, "columns_dropped": [col]}
+    params = params or {}
+    named = list(params.get("columns") or ([col] if col else []))
+    if named:
+        missing = [c for c in named if c not in df.columns]
+        if missing:
+            raise ValueError(f"column(s) do not exist: {missing}")
+        out = df.drop(columns=named)
+        return out, {"rows_affected": 0, "columns_dropped": named}
     with pd.option_context("future.no_silent_downcasting", True):
         probe = df.replace(r"^\s*$", pd.NA, regex=True) if len(df) else df
     blank = [c for c in df.columns if probe[c].isna().all()]
@@ -74,21 +78,23 @@ def drop_blank_columns(df: pd.DataFrame, col: str | None = None, params: dict | 
 @_tool
 def replace_values(df: pd.DataFrame, col: str, params: dict | None = None):
     """Find/replace within one column. params: find (required), replace
-    (default ""), regex (bool, default False), match_case (bool, default True).
-    Matches whole cell values unless regex=True (then it's a substring regex)."""
+    (default ""), regex (bool), contains (bool — replace the substring inside
+    cells instead of whole-cell match), match_case (bool, default True)."""
     params = params or {}
     if "find" not in params:
         raise ValueError("replace_values needs params.find")
     find = str(params["find"])
     repl = str(params.get("replace", ""))
     use_regex = bool(params.get("regex", False))
+    substring = bool(params.get("contains", False))
     match_case = bool(params.get("match_case", True))
     out = df.copy()
     s = out[col].astype("string")
-    if use_regex:
+    if use_regex or substring:
+        pattern = find if use_regex else re.escape(find)
         flags = 0 if match_case else re.IGNORECASE
         try:
-            rx = re.compile(find, flags)
+            rx = re.compile(pattern, flags)
         except re.error as exc:
             raise ValueError(f"invalid regex '{find}': {exc}") from exc
         new = s.str.replace(rx, repl, regex=True)
@@ -100,6 +106,117 @@ def replace_values(df: pd.DataFrame, col: str, params: dict | None = None):
     n = int((new != s).fillna(False).sum())
     out[col] = new.where(s.notna(), other=out[col])
     return out, {"rows_affected": n}
+
+
+@_tool
+def drop_rows_where(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Delete (or keep only) rows matching a condition on one column.
+    Destructive — the planner may only propose it on an explicit user ask,
+    and the executor keeps the original df so it is always recoverable.
+
+    params — exactly one condition:
+      equals: value            (whole-cell match; match_case bool, default True)
+      contains: substring      (literal, case-insensitive if match_case=False)
+      regex: pattern
+      is_null: true            (rows where the cell is missing)
+      min / max: number        (rows with value < min or > max are dropped)
+    plus keep: true  — invert: keep ONLY the matching rows instead.
+    """
+    params = params or {}
+    s = df[col]
+    match_case = bool(params.get("match_case", True))
+
+    if "equals" in params:
+        target = str(params["equals"])
+        vals = s.astype(str)
+        mask = (vals == target) if match_case else (vals.str.lower() == target.lower())
+    elif "contains" in params:
+        mask = s.astype(str).str.contains(re.escape(str(params["contains"])),
+                                          case=match_case, na=False)
+    elif "regex" in params:
+        try:
+            mask = s.astype(str).str.contains(params["regex"], regex=True, na=False)
+        except re.error as exc:
+            raise ValueError(f"invalid regex '{params['regex']}': {exc}") from exc
+    elif params.get("is_null"):
+        mask = s.isna()
+    elif "min" in params or "max" in params:
+        num = pd.to_numeric(s, errors="coerce")
+        mask = pd.Series(False, index=df.index)
+        if "min" in params:
+            mask |= num < params["min"]
+        if "max" in params:
+            mask |= num > params["max"]
+    else:
+        raise ValueError("drop_rows_where needs one of: equals, contains, "
+                         "regex, is_null, min/max")
+    mask = mask.fillna(False)
+    if params.get("keep"):
+        mask = ~mask
+    out = df[~mask]  # index preserved for diffing
+    return out, {"rows_affected": int(mask.sum())}
+
+
+@_tool
+def scale_numeric(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Scale a numeric column: minmax (0..1) or zscore. The scaling constants
+    go into stats so the transform is documented and invertible."""
+    params = params or {}
+    method = params.get("method", "minmax")
+    out = df.copy()
+    s = pd.to_numeric(out[col], errors="coerce").astype(float)
+    s = s.mask(~np.isfinite(s.fillna(0.0)) & s.notna())
+    if s.notna().sum() < 2:
+        raise ValueError(f"'{col}' needs at least 2 numeric values to scale")
+    if method == "minmax":
+        lo, hi = s.min(), s.max()
+        if hi == lo:
+            raise ValueError(f"'{col}' is constant; nothing to scale")
+        out[col] = (s - lo) / (hi - lo)
+        stats = {"min": float(lo), "max": float(hi)}
+    elif method == "zscore":
+        mu, sd = s.mean(), s.std()
+        if sd == 0:
+            raise ValueError(f"'{col}' is constant; nothing to scale")
+        out[col] = (s - mu) / sd
+        stats = {"mean": round(float(mu), 6), "std": round(float(sd), 6)}
+    else:
+        raise ValueError(f"unknown scale method: {method}")
+    return out, {"rows_affected": int(s.notna().sum()), "method": method, **stats}
+
+
+@_tool
+def format_text(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Unify text casing in a column: upper / lower / title / sentence."""
+    params = params or {}
+    case = params.get("case", "title")
+    out = df.copy()
+    s = out[col].astype("string")
+    fns = {"upper": lambda v: v.upper(), "lower": lambda v: v.lower(),
+           "title": lambda v: v.title(),
+           "sentence": lambda v: v[:1].upper() + v[1:].lower() if v else v}
+    if case not in fns:
+        raise ValueError(f"unknown case: {case} (use upper/lower/title/sentence)")
+    new = s.map(lambda v: v if pd.isna(v) else fns[case](str(v)))
+    n = int((new != s).fillna(False).sum())
+    out[col] = new
+    return out, {"rows_affected": n, "case": case}
+
+
+@_tool
+def round_numbers(df: pd.DataFrame, col: str, params: dict | None = None):
+    """Round a numeric column to N decimals (default 2)."""
+    params = params or {}
+    decimals = int(params.get("decimals", 2))
+    out = df.copy()
+    s = pd.to_numeric(out[col], errors="coerce")
+    if s.notna().sum() == 0:
+        raise ValueError(f"'{col}' has no numeric values to round")
+    rounded = s.round(decimals)
+    n = int(((rounded != s) & s.notna()).sum())
+    # only overwrite cells that parsed as numbers; text/nulls stay untouched
+    out[col] = rounded.where(rounded.notna(), other=out[col])
+    return out, {"rows_affected": n, "decimals": decimals}
 
 
 @_tool
@@ -304,7 +421,10 @@ def impute_missing(df: pd.DataFrame, col: str, params: dict | None = None):
 
 @_tool
 def flag_outliers(df: pd.DataFrame, col: str, params: dict | None = None):
-    """IQR or z-score -> adds <col>_outlier bool column. Flags, never deletes."""
+    """IQR or z-score -> adds <col>_outlier bool column. Flags by default —
+    params.action="drop" removes the flagged rows instead, and the planner
+    may only propose that on an explicit user ask (recoverable regardless:
+    the executor keeps the original df)."""
     params = params or {}
     method = params.get("method", "iqr")
     out = df.copy()
@@ -320,6 +440,10 @@ def flag_outliers(df: pd.DataFrame, col: str, params: dict | None = None):
     else:
         raise ValueError(f"unknown outlier method: {method}")
     mask = mask.fillna(False)
+    if params.get("action") == "drop":
+        out = out[~mask]  # index preserved for diffing
+        return out, {"rows_affected": int(mask.sum()), "method": method,
+                     "action": "drop"}
     out[f"{col}_outlier"] = mask
     return out, {"rows_affected": int(mask.sum()), "method": method}
 

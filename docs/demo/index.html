@@ -16,13 +16,19 @@
     --warn:#ffd649; --warn-dim:rgba(255,214,73,.10);
     --danger:#ffb4ab; --danger-dim:rgba(255,180,171,.10);
     --mono:"JetBrains Mono",ui-monospace,'Cascadia Code',Consolas,monospace;
+    --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,
+           "Helvetica Neue",Arial,sans-serif;
     --r:3px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html{color-scheme:dark}
-  body{background:var(--bg);color:var(--text);font-family:var(--mono);
-       font-size:13px;line-height:1.55;height:100dvh;display:flex;
+  /* Readable system sans for UI text; JetBrains Mono stays for data,
+     numbers and micro-labels — the technical accent, not the body. */
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);
+       font-size:14px;line-height:1.55;height:100dvh;display:flex;
        flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+  .micro,.seclabel,.filechip,.buffer,.dataview,.stat-tiles,.tl-item .when,
+  .card .k,.badge,.logo,#encode-legend,pre,code{font-family:var(--mono)}
   ::selection{background:var(--accent-dim);color:var(--accent)}
   ::-webkit-scrollbar{width:9px;height:9px}
   ::-webkit-scrollbar-track{background:var(--bg)}
@@ -38,7 +44,7 @@
   button{font:inherit;cursor:pointer;border-radius:var(--r);padding:.42rem .85rem;
          border:1px solid var(--border);background:var(--surface-2);color:var(--text);
          transition:border-color .15s,background .15s,color .15s;min-height:36px;
-         text-transform:uppercase;letter-spacing:.08em;font-size:.68rem}
+         text-transform:uppercase;letter-spacing:.08em;font-size:.72rem}
   button:hover{border-color:var(--accent);color:var(--accent)}
   button:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
   button.primary{background:var(--accent);border-color:var(--accent);color:#04211c;
@@ -51,9 +57,9 @@
         border:1px solid var(--border);border-radius:var(--r);padding:.5rem .7rem}
   input:focus-visible,textarea:focus-visible,select:focus-visible{
         outline:2px solid var(--accent-2);outline-offset:1px}
-  textarea{resize:vertical;min-height:4.2rem;width:100%;font-size:.76rem}
+  textarea{resize:vertical;min-height:4.2rem;width:100%;font-size:.85rem}
   .hintchips{display:flex;flex-wrap:wrap;gap:.35rem}
-  .chip{font:inherit;font-size:.66rem;color:var(--text-muted);background:var(--surface-2);
+  .chip{font:inherit;font-size:.74rem;color:var(--text-muted);background:var(--surface-2);
     border:1px solid var(--border);border-radius:var(--r);padding:.18rem .6rem;cursor:pointer}
   .chip:hover{color:var(--accent);border-color:var(--accent)}
 
@@ -99,7 +105,7 @@
 
   /* ---------- left: timeline + versions ---------- */
   .tl{display:flex;flex-direction:column;gap:.1rem;position:relative}
-  .tl-item{display:flex;gap:.6rem;padding:.35rem 0;font-size:.68rem;
+  .tl-item{display:flex;gap:.6rem;padding:.35rem 0;font-size:.74rem;
         align-items:flex-start}
   .tl-item .dot{width:.5rem;height:.5rem;border-radius:50%;margin-top:.3rem;
         flex-shrink:0;background:var(--text-muted)}
@@ -127,7 +133,7 @@
   .card .t{font-size:.92rem;font-weight:700;line-height:1.3}
   .card .n{margin-left:auto;background:var(--warn);color:#221a00;font-weight:700;
         border-radius:var(--r);font-size:.62rem;padding:.05rem .4rem}
-  .card .colname{color:var(--text-muted);font-size:.66rem}
+  .card .colname{color:var(--text-muted);font-size:.72rem;font-family:var(--mono)}
   .card .minibar{display:flex;gap:2px;align-items:flex-end;height:2rem}
   .card .minibar i{flex:1;background:var(--accent);opacity:.35;min-height:2px}
   .card .minibar i.hot{opacity:1}
@@ -144,9 +150,10 @@
         border:1.5px solid var(--border);display:flex;align-items:center;
         justify-content:center;color:transparent;font-size:.68rem;margin-top:.1rem}
   .suggestion.on .tick{background:var(--accent);border-color:var(--accent);color:#04211c}
-  .suggestion .tool{font-weight:700;color:var(--accent);font-size:.76rem}
-  .suggestion .on-col{color:var(--accent-2);font-size:.68rem}
-  .suggestion .why{color:var(--text-muted);font-size:.68rem;margin-top:.2rem;
+  .suggestion .tool{font-weight:700;color:var(--accent);font-size:.82rem;
+        font-family:var(--mono)}
+  .suggestion .on-col{color:var(--accent-2);font-size:.74rem}
+  .suggestion .why{color:var(--text-muted);font-size:.76rem;margin-top:.2rem;
         line-height:1.45}
   .thinking{display:flex;align-items:center;gap:.6rem;font-size:.72rem;
         color:var(--accent-2)}
@@ -154,7 +161,7 @@
         border-top-color:var(--accent-2);border-radius:50%;
         animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .verdict{display:flex;justify-content:space-between;gap:.5rem;font-size:.68rem;
+  .verdict{display:flex;justify-content:space-between;gap:.5rem;font-size:.74rem;
         padding:.32rem .6rem;border-radius:var(--r);background:var(--surface);
         border:1px solid var(--border)}
   .v-resolved{color:var(--ok)} .v-flagged{color:var(--accent-2)}
@@ -163,7 +170,7 @@
   .errbox{color:var(--danger);background:var(--danger-dim);
         border:1px solid var(--danger);border-radius:var(--r);
         padding:.5rem .7rem;font-size:.72rem}
-  .notebox{color:var(--text-muted);font-size:.66rem;border-left:2px solid var(--accent);
+  .notebox{color:var(--text-muted);font-size:.74rem;border-left:2px solid var(--accent);
         padding:.35rem .7rem;background:var(--surface);line-height:1.5}
 
   /* ---------- right: raw buffer + entropy ---------- */
@@ -378,12 +385,17 @@
 
         <div class="seclabel">ask the agent</div>
         <div class="hintchips" id="hintchips" aria-label="Example instructions">
+          <button class="chip" type="button" style="color:var(--accent);border-color:var(--accent)">clean everything</button>
           <button class="chip" type="button">remove blank rows</button>
           <button class="chip" type="button">remove duplicates</button>
           <button class="chip" type="button">fix the dates</button>
+          <button class="chip" type="button">delete rows where status is inactive</button>
           <button class="chip" type="button">change these to 1,2,3,4 by unique value</button>
-          <button class="chip" type="button">replace N/A with nothing</button>
+          <button class="chip" type="button">replace every A with B</button>
           <button class="chip" type="button">fill missing with the average</button>
+          <button class="chip" type="button">make names title case</button>
+          <button class="chip" type="button">remove the outliers</button>
+          <button class="chip" type="button">normalize between 0 and 1</button>
         </div>
         <textarea id="instruction"
           placeholder="optional — e.g. normalize all dates to ISO, but don't touch the email column…"

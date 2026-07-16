@@ -13,6 +13,11 @@ drop_blank_rows = TOOLS["drop_blank_rows"]
 drop_blank_columns = TOOLS["drop_blank_columns"]
 replace_values = TOOLS["replace_values"]
 encode_categories = TOOLS["encode_categories"]
+drop_rows_where = TOOLS["drop_rows_where"]
+scale_numeric = TOOLS["scale_numeric"]
+format_text = TOOLS["format_text"]
+round_numbers = TOOLS["round_numbers"]
+flag_outliers = TOOLS["flag_outliers"]
 
 
 def blanky_df():
@@ -101,6 +106,96 @@ def test_encode_categories_orderings():
     assert freq["mapping"]["c"] == 1                            # most frequent -> 1
     _, appear = encode_categories(df, "g", {"order": "appearance"})
     assert appear["mapping"] == {"b": 1, "a": 2, "c": 3}        # order seen
+
+
+def test_drop_rows_where_conditions():
+    df = pd.DataFrame({"status": ["Active", "inactive", "Active", None],
+                       "age": ["25", "200", "40", "30"]})
+    out, s = drop_rows_where(df, "status", {"equals": "inactive"})
+    assert s["rows_affected"] == 1 and len(out) == 3
+    out, s = drop_rows_where(df, "status", {"equals": "ACTIVE",
+                                            "match_case": False})
+    assert s["rows_affected"] == 2
+    out, s = drop_rows_where(df, "status", {"is_null": True})
+    assert s["rows_affected"] == 1
+    out, s = drop_rows_where(df, "age", {"min": 0, "max": 120})
+    assert s["rows_affected"] == 1 and "200" not in out["age"].values
+    out, s = drop_rows_where(df, "status", {"equals": "Active", "keep": True})
+    assert len(out) == 2 and set(out["status"]) == {"Active"}
+    out, s = drop_rows_where(df, "status", {"contains": "activ",
+                                            "match_case": False})
+    assert s["rows_affected"] == 3
+    with pytest.raises(ValueError):
+        drop_rows_where(df, "status", {})
+
+
+def test_scale_numeric_minmax_and_zscore():
+    df = pd.DataFrame({"v": [10.0, 20.0, 30.0, None]})
+    out, s = scale_numeric(df, "v", {"method": "minmax"})
+    assert list(out["v"].dropna()) == [0.0, 0.5, 1.0]
+    assert s["min"] == 10.0 and s["max"] == 30.0
+    out, s = scale_numeric(df, "v", {"method": "zscore"})
+    assert abs(out["v"].dropna().mean()) < 1e-9
+    with pytest.raises(ValueError):
+        scale_numeric(pd.DataFrame({"v": [5, 5, 5]}), "v")
+
+
+def test_format_text_cases():
+    df = pd.DataFrame({"n": ["ana CRUZ", "BEN reyes", None]})
+    out, s = format_text(df, "n", {"case": "title"})
+    assert list(out["n"].dropna()) == ["Ana Cruz", "Ben Reyes"]
+    assert s["rows_affected"] == 2
+    out, _ = format_text(df, "n", {"case": "upper"})
+    assert out["n"][0] == "ANA CRUZ"
+    with pytest.raises(ValueError):
+        format_text(df, "n", {"case": "spongebob"})
+
+
+def test_round_numbers_preserves_text():
+    df = pd.DataFrame({"p": [1.239, 2.5, "n/a", None]})
+    out, s = round_numbers(df, "p", {"decimals": 1})
+    assert out["p"][0] == 1.2 and out["p"][2] == "n/a"
+    assert s["rows_affected"] == 1        # 2.5 already at 1 decimal
+
+
+def test_replace_values_contains_substring():
+    df = pd.DataFrame({"c": ["plan a x", "a-team", "beta", None]})
+    out, s = replace_values(df, "c", {"find": "a", "replace": "b",
+                                      "contains": True})
+    assert list(out["c"].dropna()) == ["plbn b x", "b-tebm", "betb"]
+    assert s["rows_affected"] == 3
+
+
+def test_flag_outliers_drop_action():
+    df = pd.DataFrame({"v": [10, 11, 12, 11, 10, 999]})
+    out, s = flag_outliers(df, "v", {"method": "iqr", "action": "drop"})
+    assert s["rows_affected"] == 1 and 999 not in out["v"].values
+    assert "v_outlier" not in out.columns
+
+
+def test_drop_blank_columns_multi():
+    df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
+    out, s = drop_blank_columns(df, None, {"columns": ["a", "c"]})
+    assert list(out.columns) == ["b"]
+    with pytest.raises(ValueError):
+        drop_blank_columns(df, None, {"columns": ["nope"]})
+
+
+def test_instruction_only_tools_gated():
+    prof = profile(pd.DataFrame({"v": [1.0, 2.0, 3.0]}))
+    for step in [
+        {"tool": "drop_rows_where", "col": "v", "params": {"min": 0},
+         "reason": "r"},
+        {"tool": "scale_numeric", "col": "v", "params": {}, "reason": "r"},
+        {"tool": "format_text", "col": "v", "params": {}, "reason": "r"},
+        {"tool": "round_numbers", "col": "v", "params": {}, "reason": "r"},
+        {"tool": "flag_outliers", "col": "v",
+         "params": {"action": "drop"}, "reason": "r"},
+    ]:
+        plan = {"steps": [step]}
+        with pytest.raises(PlanValidationError):
+            validate_plan(plan, prof)                        # autonomous: no
+        assert validate_plan(plan, prof, allow_impute_fill=True)  # asked: yes
 
 
 def test_profiler_blank_signals():

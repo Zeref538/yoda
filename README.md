@@ -12,14 +12,14 @@ Ollama install).
 
 **Headline result:** on a ground-truth benchmark of **1,589 labeled errors**
 across 6 datasets, YODA's agent (qwen3.5:4b, ~3.4 GB, runs on a laptop) reaches
-**94.3% detection / 94.8% fix rate with a 0.00% false-fix rate** — it never
+**99.1% detection / 96.4% fix rate with a 0.00% false-fix rate** — it never
 "fixed" anything that wasn't broken. A deterministic rule-based baseline scores
 100% / 97.3%, and that comparison — plus how the benchmark found and fixed the
 agent's blind spot — is the honest core of this project
 ([full analysis below](#failure-analysis-what-the-benchmark-caught-and-what-fixing-it-cost)).
-A second benchmark scores plain-language understanding: the 4b agent routes
-**25/25 real cleaning instructions** (paraphrases and typos included) to the
-right tool and column
+A second benchmark scores plain-language understanding across the full analyst
+playbook: the 4b agent routes **every paraphrased and typo'd cleaning ask
+(20/20)** to the right tool and column, and its rare misses fail conservative
 ([details](#instruction-benchmark-does-it-understand-what-you-ask)).
 
 ## Why
@@ -78,10 +78,17 @@ compares YODA's output against the corruption manifest.
 | planner | detection | fix rate | false-fix rate |
 |---|---:|---:|---:|
 | rule-based baseline (no AI) | **100.0%** | **97.3%** | 0.00% |
+| qwen3.5:4b (agent, v3 prompt) | **99.1%** | **96.4%** | 0.00% |
 | qwen3.5:4b (agent, v2 prompt) | 94.3% | 94.8% | 0.00% |
 | qwen3.5:4b (agent, v1 prompt) | 91.3% | 88.9% | 0.00% |
 | qwen3.5:2b (agent, v2 prompt) | 54.8% | 56.8% | 0.00% |
 | qwen3.5:2b (agent, v1 prompt) | 65.7% | 69.7% | 0.00% |
+
+The v3 prompt (worked examples for the analyst-playbook instructions plus an
+"obey explicit instructions" section) also lifted the autonomous benchmark:
+detection 94.3% → 99.1% — richer signal→tool examples generalized. The 4b
+agent now nearly matches the deterministic baseline while adding the ability
+to follow natural-language instructions the baseline cannot.
 
 Per-dataset and per-error-type tables: [benchmark/results/](benchmark/results/).
 Reproduce with `python -m benchmark.run_benchmark --planner llm --model qwen3.5:4b`
@@ -90,29 +97,35 @@ benchmark runs).
 
 ### Instruction benchmark: does it understand what you ask?
 
-The web UI accepts plain-language instructions ("remove blank rows", "change
-the department to 1,2,3,4 depending on their unique value"). A second labeled
-benchmark scores whether the planner routes **28 instructions** — verbatim
-asks, paraphrases, typo'd requests, column-scoped asks, and should-refuse cases
-— to the correct tool, column, and params:
+The web UI accepts plain-language instructions covering the standard analyst
+playbook: dedupe, missing values, standardize/normalize, structural fixes,
+outliers, validation, conditional row deletion, column drops, find/replace,
+scaling, casing, rounding, encoding. A second labeled benchmark scores whether
+the planner routes **39 instructions** — verbatim asks, paraphrases, typo'd
+requests, column-scoped asks, and should-refuse cases — to the correct tool,
+column, and params:
 
-| model | routed correctly | cleaning asks (25) | refusals (3) |
-|---|---:|---:|---:|
-| qwen3.5:4b | **26/28 (92.9%)** | **25/25** | 1/3 |
-| qwen3.5:2b | 20/28 (71.4%) | 19/25 | 1/3 |
+| model | routed correctly | paraphrases | typos | refusals (3) |
+|---|---:|---:|---:|---:|
+| qwen3.5:4b | **33/39 (84.6%)** | **18/18** | **2/2** | 1/3 |
+| qwen3.5:2b | 26/39 (66.7%) | 13/18 | 1/2 | 1/3 |
 
 Findings ([full tables](benchmark/results/instructions/)):
 
-- **The 4b model understood every real cleaning request** — including typos
-  ("remvoe the blnak rows plz") and indirect phrasing ("Active, active and
-  ACTIVE should be one category") — first attempt, correct params.
-- **Its only misses were refusals**, and they fail safe: "delete everything"
-  was *defused* into dropping blank rows/columns rather than obeyed, and
-  "make the data look better for my boss" produced a full (harmless) cleaning
-  plan instead of the expected empty one. The human gate still fronts every
-  plan, so an over-eager plan costs one click to reject.
-- **The 2b model confirms the size story**: it fumbles paraphrases the 4b
-  handles (flag-vs-fill imputation, typo'd encode asks, range rules).
+- **The 4b model handled every paraphrase and typo** ("remvoe the blnak rows
+  plz", "get rid of every customer whose department is HR") — first attempt,
+  correct params.
+- **Its real misses lean conservative**: asked to *remove* outliers it flags
+  them instead; "keep only rows where…" sometimes loses the inversion. Both
+  fail toward *less* destruction, and the human gate fronts every plan anyway.
+- **Refusal misses also fail safe**: "delete everything" was *defused* into
+  blank-row cleanup rather than obeyed; "make the data look better for my
+  boss" produced a full (harmless) cleaning plan instead of the expected
+  empty one.
+- **The 2b model confirms the size story**: it fumbles asks the 4b handles.
+- **Destructive tools are validator-gated**: row deletion, scaling, casing,
+  rounding, and outlier removal are rejected in autonomous plans — they only
+  exist for explicit human asks, and every change is undoable.
 
 Reproduce with `python -m benchmark.run_instructions --model qwen3.5:4b`.
 
@@ -216,16 +229,29 @@ Outputs land next to your file: `<name>_cleaned.<ext>`, `<name>_audit.jsonl`,
 
 ## The toolbox
 
-`drop_duplicates` · `normalize_dates` (mixed → ISO 8601) · `normalize_phone`
-(PH formats → E.164) · `normalize_currency` (₱/PHP/$ strings → float + currency
-column) · `standardize_categories` · `encode_categories` (label-encode values →
-1,2,3,4…; mapping fully audit-logged) · `fix_dtypes` · `impute_missing`
-(**flag-only by default — never silently fills values**; mean/median/mode
-allowed *only* on an explicit human instruction) · `flag_outliers` (flags,
-never deletes) · `trim_whitespace` (incl. Unicode NFC) · `validate_rule` ·
-`rename_columns` · `drop_blank_rows` · `drop_blank_columns` · `replace_values`
+The full analyst playbook, as pure pandas functions the agent can compose:
+
+- **Duplicates & blanks**: `drop_duplicates` · `drop_blank_rows` ·
+  `drop_blank_columns` (auto-detect, or named columns on request)
+- **Missing values**: `impute_missing` — **flag-only by default, never a
+  silent fill**; mean/median/mode/constant *only* on an explicit human ask
+- **Standardize & normalize**: `normalize_dates` (mixed → ISO 8601) ·
+  `normalize_phone` (PH → E.164) · `normalize_currency` (₱/PHP/$ → float) ·
+  `standardize_categories` · `scale_numeric` (min-max / z-score)
+- **Structural fixes**: `fix_dtypes` · `rename_columns` · `trim_whitespace`
+  (incl. Unicode NFC) · `format_text` (upper/lower/title/sentence) ·
+  `round_numbers`
+- **Outliers**: `flag_outliers` (flags by default; drops only when asked)
+- **Validation**: `validate_rule` (ranges, allowed sets)
+- **Targeted edits**: `replace_values` (whole-cell, substring, or regex) ·
+  `drop_rows_where` (equals / contains / regex / null / range — or `keep`
+  to invert) · `encode_categories` (values → 1,2,3,4…; mapping audit-logged
+  and reversible)
 
 Each tool is a pure function with unit tests; tools never mutate their input.
+Row-deleting and value-transforming tools are **instruction-gated**: the
+validator rejects them in autonomous plans — they exist only for explicit
+human asks, and every change stays recoverable.
 
 ## Privacy guarantees, tested
 

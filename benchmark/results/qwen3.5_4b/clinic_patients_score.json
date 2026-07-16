@@ -53,8 +53,12 @@
     "n_false_fixes": 0
   },
   "planner_outcome": {
-    "source": "llm",
-    "attempts": 1,
-    "errors": []
+    "source": "fallback_rule_based",
+    "attempts": 3,
+    "errors": [
+      "JSONDecodeError: Expecting property name enclosed in double quotes: line 28 column 28 (char 717)",
+      "JSONDecodeError: Unterminated string starting at: line 42 column 7 (char 1097)",
+      "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+    ]
   }
 }
