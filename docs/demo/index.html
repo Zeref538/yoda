@@ -385,7 +385,7 @@
 
         <div class="seclabel">ask the agent</div>
         <div class="hintchips" id="hintchips" aria-label="Example instructions">
-          <button class="chip" type="button" style="color:var(--accent);border-color:var(--accent)">clean everything</button>
+          <button class="chip" type="button"><b>clean everything</b></button>
           <button class="chip" type="button">remove blank rows</button>
           <button class="chip" type="button">remove duplicates</button>
           <button class="chip" type="button">fix the dates</button>
@@ -919,13 +919,22 @@ function handleExecuted(d, nSteps){
   state.grid = d.grid; state.verdicts = d.verdicts; state.appliedAny = true;
   const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
   const removed = d.grid.removed_rids.length;
+  // failed/skipped steps must be loud, not silent
+  const bad = (d.audit||[]).filter(a=>a.status==="error"||a.status==="skipped");
+  $("#sugg-error").innerHTML = bad.length
+    ? `<div class="errbox"><b>${bad.length} step(s) did not run:</b><br>` +
+      bad.map(a=>esc(`${a.tool}(${a.col ?? "table"}): ${a.error}`)).join("<br>") +
+      `</div>`
+    : "";
   $("#filechip").textContent = $("#filechip").textContent
       .replace(/\(\d+ rows\)/, `(${d.n_rows_after} rows)`);
   $("#btn-undo").classList.toggle("hidden", !d.undo_depth);
   $("#status-text").textContent =
     `round ${d.round} — ${changed} cells changed, ${removed} duplicate rows removed, `+
     `${d.n_rows_after} rows remain`;
-  toast(`Applied ${nSteps} step(s) — ${changed} cells changed`);
+  toast(bad.length
+    ? `${nSteps - bad.length}/${nSteps} step(s) ran — ${bad.length} failed (see error box)`
+    : `Applied ${nSteps} step(s) — ${changed} cells changed`);
   // refresh issue cards from verdicts that resolved
   state.issues = state.issues.filter(i=>{
     const v = d.verdicts.find(v=>v.col===i.col || (!v.col && !i.col));

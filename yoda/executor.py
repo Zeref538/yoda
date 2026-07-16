@@ -12,8 +12,19 @@ from pathlib import Path
 
 import pandas as pd
 
+from yoda.planner import snake_case
 from yoda.redactor import redact_sample
 from yoda.tools import TOOLS
+
+
+def _resolve_col(col: str | None, columns) -> str | None:
+    """Tolerate column name-form drift: a plan may say 'full_name' while the
+    data still has 'Full Name' (e.g. rename_columns was skipped or ordered
+    later). If exactly one column snake_cases to the same key, use it."""
+    if col is None or col in columns:
+        return col
+    matches = [c for c in columns if snake_case(str(c)) == snake_case(str(col))]
+    return matches[0] if len(matches) == 1 else col
 
 
 def _examples(before: pd.DataFrame, after: pd.DataFrame, col: str | None, n: int = 3) -> list:
@@ -56,11 +67,14 @@ def execute(
             entry.update(status="skipped", error=f"unknown tool: {tool_name}")
             audit.append(entry)
             continue
+        resolved = _resolve_col(col, current.columns)
+        if resolved != col:
+            entry["col_resolved_to"] = resolved
         t0 = time.perf_counter()
         try:
-            new_df, stats = fn(current, col, params)
+            new_df, stats = fn(current, resolved, params)
             entry.update(status="ok", **stats,
-                         examples=_examples(current, new_df, col),
+                         examples=_examples(current, new_df, resolved),
                          duration_ms=round((time.perf_counter() - t0) * 1000, 1))
             current = new_df
         except Exception as exc:  # a bad step must never destroy the run

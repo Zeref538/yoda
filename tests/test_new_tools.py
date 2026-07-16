@@ -198,6 +198,27 @@ def test_instruction_only_tools_gated():
         assert validate_plan(plan, prof, allow_impute_fill=True)  # asked: yes
 
 
+def test_executor_resolves_name_form_drift():
+    """A plan that says 'full_name' must still work when the data has
+    'Full Name' (rename_columns skipped or ordered later)."""
+    from yoda.executor import execute
+    df = pd.DataFrame({"Full Name": [" ana ", "ben"], "Age": [1, 2]})
+    cleaned, audit = execute(df, [
+        {"tool": "trim_whitespace", "col": "full_name", "params": {},
+         "reason": "r"}])
+    assert audit[0]["status"] == "ok"
+    assert audit[0]["col_resolved_to"] == "Full Name"
+    assert cleaned["Full Name"][0] == "ana"
+    # ambiguous or truly missing names still fail loudly
+    df2 = pd.DataFrame({"a b": [1], "a_b": [2]})
+    _, audit2 = execute(df2, [{"tool": "trim_whitespace", "col": "a_b",
+                               "params": {}, "reason": "r"}])
+    assert audit2[0]["status"] == "ok"          # exact match wins
+    _, audit3 = execute(df, [{"tool": "trim_whitespace", "col": "ghost",
+                              "params": {}, "reason": "r"}])
+    assert audit3[0]["status"] == "error"
+
+
 def test_profiler_blank_signals():
     prof = profile(blanky_df())
     assert prof["blank_rows"] == 2

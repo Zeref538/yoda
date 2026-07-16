@@ -330,11 +330,17 @@ class LLMPlanner:
 
     def __init__(self, model: str = "qwen3.5:4b",
                  host: str = "http://localhost:11434",
-                 max_retries: int = 3, timeout: int = 300) -> None:
+                 max_retries: int = 3, timeout: int = 300,
+                 think: bool | None = None) -> None:
         self.model = model
         self.host = host
         self.max_retries = max_retries
         self.timeout = timeout
+        # think=False: force thinking off for every request (interactive UI —
+        # thinking models can return empty content under structured output).
+        # None: only instruction/col-scoped requests disable it (benchmark
+        # default, keeps published runs comparable).
+        self.think = think
         self.last_outcome: dict = {}  # telemetry for reports/benchmark
 
     def _chat(self, messages: list[dict], think: bool | None = None) -> str:
@@ -386,7 +392,8 @@ class LLMPlanner:
             try:
                 raw = self._chat(
                     messages,
-                    think=False if (instruction or col) else None)
+                    think=self.think if self.think is not None
+                    else (False if (instruction or col) else None))
                 plan_obj = json.loads(raw)
                 steps = validate_plan(plan_obj, profile,
                                       allow_impute_fill=bool(instruction))

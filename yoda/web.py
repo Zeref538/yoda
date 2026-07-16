@@ -189,7 +189,10 @@ def plan(body: dict):
             steps = [s for s in steps if s.get("col") in (col, None)]
         outcome = {"source": "rule_based"}
     else:
-        S["planner"] = LLMPlanner(model=body.get("model", "qwen3.5:4b"))
+        # Interactive UI: force thinking off — thinking models return empty
+        # content under structured output and burn all retries.
+        S["planner"] = LLMPlanner(model=body.get("model", "qwen3.5:4b"),
+                                  think=False)
         steps = S["planner"].plan(prof, instruction=instruction, col=col)
         if col:  # keep the model honest: never leak steps onto other columns
             steps = [s for s in steps if s.get("col") in (col, None)]
