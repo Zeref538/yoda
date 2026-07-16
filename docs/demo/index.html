@@ -477,16 +477,17 @@
   <div class="right">
     <div class="paneltitle">Local Intel
       <small id="intel-sub">no data loaded</small></div>
-    <div class="seclabel">raw buffer <span id="buffer-n"></span></div>
-    <div class="buffer" id="buffer">
-      <div class="notebox" style="border:none">A small preview renders here —
-        the full data stays in local memory. Double-click a cell to edit.</div>
-    </div>
+    <div class="seclabel">session</div>
+    <div id="session-stats"><div class="notebox">load a file to begin —
+      everything happens in local memory</div></div>
+    <div class="seclabel">privacy monitor</div>
+    <div id="privacy-box" class="notebox">The model receives a statistical
+      profile only — raw cell values never leave this machine.</div>
     <div class="seclabel">issue density by column</div>
     <div class="entropy" id="entropy" title="teal = clean, yellow = issues"></div>
     <div class="seclabel">selected column</div>
-    <div id="colstats"><div class="notebox">click a column in the raw buffer
-      or an issue card</div></div>
+    <div id="colstats"><div class="notebox">click a column header in the data
+      view or an issue card</div></div>
   </div>
 </div>
 
@@ -793,48 +794,25 @@ document.addEventListener("keydown", e=>{
   }
 });
 
-/* ---------- raw buffer (small preview) ---------- */
-const BUFFER_ROWS = 8;
+/* ---------- session brief (right panel; data view does the previewing) --- */
 function renderBuffer(){
-  const g = state.grid, box = $("#buffer");
+  const g = state.grid;
   if(!g){ return; }
-  const changed = g.changed||{}, newCols = new Set(g.new_cols||[]);
-  const cols = g.columns;
-  let html = "<table><thead><tr>";
-  cols.forEach(c=>html += `<th data-col="${esc(c)}" title="${esc(c)}"
-      class="${c===state.selectedCol?"selected":""}">${esc(c)}</th>`);
-  html += "</tr></thead><tbody>";
-  g.rows.slice(0, BUFFER_ROWS).forEach(r=>{
-    html += `<tr data-rid="${r.rid}">`;
-    r.cells.forEach((v,ci)=>{
-      const col = cols[ci];
-      const isCh = (changed[col]||[]).includes(r.rid);
-      const cls = newCols.has(col) ? "newcell" : isCh ? "changed" : "";
-      const was = isCh ? g.before?.[col]?.[String(r.rid)] : undefined;
-      html += `<td class="${cls}" data-c="${ci}"
-        title="${esc(was!==undefined?`was: ${was||"(empty)"}`:v)}">${esc(v)}</td>`;
-    });
-    html += "</tr>";
-  });
-  html += "</tbody></table>";
-  box.innerHTML = html;
-  $("#buffer-n").textContent = `(head ${Math.min(BUFFER_ROWS, g.rows.length)} of ${g.n_total_rows})`;
-  box.querySelectorAll("th").forEach(th=>{
-    th.addEventListener("click", ()=>{
-      state.selectedCol = th.dataset.col;
-      $("#scope-note").textContent = `scope: ${th.dataset.col}`;
-      loadColStats(th.dataset.col); renderIssueCards(); highlightBufferCol();
-    });
-  });
-  box.querySelectorAll("td").forEach(td=>{
-    td.addEventListener("dblclick", ()=>editCellInline(td));
-  });
+  const rows0 = state.origRows ?? g.n_total_rows;
+  const delta = rows0 - g.n_total_rows;
+  const changed = Object.values(g.changed||{}).reduce((a,r)=>a+r.length,0);
+  const openIssues = state.issues.length;
+  $("#session-stats").innerHTML = `<div class="stat-tiles">
+    <span><b>rows</b>${g.n_total_rows}${delta>0
+      ? ` <span style="color:var(--ok)">(-${delta})</span>` : ""}</span>
+    <span><b>columns</b>${g.columns.length}</span>
+    <span><b>open issues</b><span style="${openIssues?'color:var(--warn)':''}">
+      ${openIssues}</span></span>
+    <span><b>changes</b>${state.nEdits||0}</span>
+  </div>`;
   renderDataView();
 }
-function highlightBufferCol(){
-  document.querySelectorAll("#buffer th").forEach(th=>
-    th.classList.toggle("selected", th.dataset.col===state.selectedCol));
-}
+function highlightBufferCol(){ /* raw buffer retired — data view highlights */ }
 let editing = false;
 function editCellInline(td){
   if(editing) return; editing = true;
@@ -1085,6 +1063,7 @@ $("#btn-decode").addEventListener("click", async ()=>{
 
 function handleExecuted(d, nSteps){
   state.grid = d.grid; state.verdicts = d.verdicts; state.appliedAny = true;
+  state.nUntargeted = d.n_untargeted || 0;
   const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
   const removed = d.grid.removed_rids.length;
   // failed/skipped steps must be loud, not silent
@@ -1143,7 +1122,18 @@ const VERDICT_UI = {
 };
 
 function renderVerdicts(){
-  if(!state.verdicts.length){ $("#verify-box").classList.add("hidden"); return; }
+  if(!state.verdicts.length){
+    // run targeted nothing the verifier tracks (e.g. encode/replace/manual)
+    if(state.appliedAny && state.nUntargeted){
+      $("#verify-box").classList.remove("hidden");
+      $("#verdicts").innerHTML = `<div class="notebox">This run's changes
+        aren't the kind the verifier counts (edits, encoding, replacements…)
+        — check the green cells in the data view. ${state.nUntargeted}
+        known issue(s) remain on the issue cards.</div>`;
+      return;
+    }
+    $("#verify-box").classList.add("hidden"); return;
+  }
   $("#verify-box").classList.remove("hidden");
   const vs = state.verdicts;
   const counts = {};
@@ -1159,7 +1149,8 @@ function renderVerdicts(){
       more steps and run again).</div>`;
   }else{
     html += `<div style="font-size:.85rem;margin-bottom:.15rem">
-      <b style="color:var(--ok)">${done} of ${vs.length}</b> issues fixed or flagged</div>`;
+      <b style="color:var(--ok)">${done} of ${vs.length}</b> targeted issue${
+      vs.length===1?"":"s"} fixed or flagged</div>`;
   }
   html += `<div style="display:flex;height:8px;border-radius:var(--r);overflow:hidden;
       border:1px solid var(--border);margin-bottom:.6rem" role="img"
@@ -1204,6 +1195,10 @@ function renderVerdicts(){
         <span style="color:${ui.color};white-space:nowrap">${ui.word}</span>
       </div>`;
     }).join("");
+  if(state.nUntargeted)
+    html += `<div class="micro" style="text-transform:none;letter-spacing:0;
+      margin-top:.35rem">only what this run targeted is scored —
+      ${state.nUntargeted} other known issue(s) stay on the issue cards</div>`;
   $("#verdicts").innerHTML = html;
 }
 
@@ -1223,6 +1218,10 @@ async function loadTimeline(){
     document.querySelectorAll("[data-revert]").forEach(b=>
       b.addEventListener("click", ()=>revertTo(+b.dataset.revert)));
     renderVersions(h.versions);
+    // session brief numbers come from the timeline (single source of truth)
+    state.origRows = h.timeline[0]?.n_rows;
+    state.nEdits = Math.max(0, h.timeline.length - 1);
+    renderBuffer();
   }catch(e){}
 }
 function renderVersions(versions){
@@ -1326,6 +1325,13 @@ async function loadPII(){
   try{
     const d = await (await api("/api/scan")).json();
     const s = d.summary;
+    const riskColor = {high:"var(--danger)",medium:"var(--warn)",
+                       low:"var(--ok)",none:"var(--ok)"}[s.highest_risk]||"var(--ok)";
+    $("#privacy-box").innerHTML = `The model receives a statistical profile
+      only — <b>0 raw values</b> ever leave this machine.<br>
+      PII scan: <b>${s.n_columns_with_pii}</b>/${s.n_columns_scanned} columns
+      flagged · highest risk
+      <b style="color:${riskColor}">${esc(s.highest_risk)}</b>`;
     $("#pii-status").textContent =
       `pii: ${s.n_columns_with_pii}/${s.n_columns_scanned} cols · risk ${s.highest_risk}`;
     $("#pii-box").innerHTML = d.columns.length ? d.columns.map(f=>{

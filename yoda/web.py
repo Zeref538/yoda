@@ -201,6 +201,39 @@ def plan(body: dict):
     return {"steps": steps, "outcome": outcome}
 
 
+# Which verifier signals each tool is meant to address — used to show the
+# user only the verdicts their approved steps targeted (full diff still goes
+# to S["verdicts"] for the report and follow-up planning).
+_TOOL_SIGNALS = {
+    "drop_duplicates": {"duplicates"},
+    "drop_blank_rows": {"blank_rows"},
+    "trim_whitespace": {"whitespace"},
+    "normalize_dates": {"mixed_date_formats"},
+    "normalize_phone": {"phone_format_chaos"},
+    "normalize_currency": {"currency_strings", "numeric_as_string"},
+    "fix_dtypes": {"numeric_as_string", "bool_as_string"},
+    "standardize_categories": {"casing_variants"},
+    "impute_missing": {"nulls"},
+    "flag_outliers": {"outliers"},
+}
+
+
+def _targeted_verdicts(verdicts: list[dict], steps: list[dict]) -> list[dict]:
+    """Verdicts the approved steps aimed at, plus anything that *appeared*
+    because of the run (new_issue is always relevant)."""
+    from yoda.planner import snake_case
+
+    def matches(v, s):
+        if v["issue"] not in _TOOL_SIGNALS.get(s["tool"], ()):
+            return False
+        if s.get("col") is None or v["col"] is None:
+            return True
+        return snake_case(str(v["col"])) == snake_case(str(s["col"]))
+
+    return [v for v in verdicts
+            if v["verdict"] == "new_issue" or any(matches(v, s) for s in steps)]
+
+
 @app.post("/api/execute")
 def run(body: dict):
     if "prof" not in S:
@@ -225,9 +258,11 @@ def run(body: dict):
     followup = ([] if len(S["rounds"]) >= 4 or S["planner"] is None
                 else follow_up_plan(verdicts, S["planner"], new_prof))
     _snapshot(f"AI round {len(S['rounds'])}: {len(steps)} step(s)", "ai")
+    targeted = _targeted_verdicts(verdicts, steps)
     return {
         "audit": json.loads(json.dumps(audit, default=str)),
-        "verdicts": verdicts,
+        "verdicts": targeted,
+        "n_untargeted": len(verdicts) - len(targeted),
         "followup": followup,
         "round": len(S["rounds"]),
         "n_rows_before": len(S["df"]), "n_rows_after": len(cleaned),
