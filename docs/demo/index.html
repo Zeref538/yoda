@@ -1075,16 +1075,90 @@ function handleExecuted(d, nSteps){
     `<div class="notebox">nothing left for the agent — see verification below</div>`;
 }
 
+/* Friendly names + how to phrase each issue's numbers */
+const ISSUE_LABEL = {
+  duplicates: "duplicate rows", blank_rows: "blank rows",
+  mixed_date_formats: "date formats", phone_format_chaos: "phone formats",
+  currency_strings: "currency-style cells", numeric_as_string: "numbers stored as text",
+  bool_as_string: "yes/no stored as text", whitespace: "extra spaces / unicode",
+  casing_variants: "casing variants", nulls: "missing values",
+  outliers: "outliers",
+};
+const PCT_ISSUES = new Set(["nulls"]);
+function fmtV(issue, x){
+  return PCT_ISSUES.has(issue) ? `${x}%` : String(x);
+}
+const VERDICT_UI = {
+  resolved:          {word: "fixed",        color: "var(--ok)",     icon: "✓"},
+  flagged:           {word: "flagged",      color: "var(--accent-2)", icon: "⚑"},
+  partially_resolved:{word: "partly fixed", color: "var(--warn)",   icon: "◐"},
+  unresolved:        {word: "not fixed",    color: "var(--danger)", icon: "✗"},
+  new_issue:         {word: "new issue",    color: "var(--danger)", icon: "!"},
+};
+
 function renderVerdicts(){
   if(!state.verdicts.length){ $("#verify-box").classList.add("hidden"); return; }
   $("#verify-box").classList.remove("hidden");
-  const order = {unresolved:0,new_issue:0,partially_resolved:1,flagged:2,resolved:3};
-  $("#verdicts").innerHTML = [...state.verdicts]
-    .sort((a,b)=>(order[a.verdict]??9)-(order[b.verdict]??9)).map(v=>
-    `<div class="verdict"><span>${esc(v.issue)}
-       <span style="color:var(--accent-2)">${esc(v.col??"whole table")}</span></span>
-     <span class="v-${v.verdict}">${esc(v.verdict.replaceAll("_"," "))}
-       ${esc(String(v.before))}&rarr;${esc(String(v.after))}</span></div>`).join("");
+  const vs = state.verdicts;
+  const counts = {};
+  vs.forEach(v=>counts[v.verdict] = (counts[v.verdict]||0)+1);
+  const done = (counts.resolved||0) + (counts.flagged||0);
+
+  // headline + stacked progress bar
+  let html = "";
+  if(done === 0){
+    html += `<div class="errbox" style="margin-bottom:.5rem"><b>Nothing changed
+      in this run.</b> Every issue still has the same count — the steps you
+      approved didn't touch the data (check the error box above, or approve
+      more steps and run again).</div>`;
+  }else{
+    html += `<div style="font-size:.85rem;margin-bottom:.15rem">
+      <b style="color:var(--ok)">${done} of ${vs.length}</b> issues fixed or flagged</div>`;
+  }
+  html += `<div style="display:flex;height:8px;border-radius:var(--r);overflow:hidden;
+      border:1px solid var(--border);margin-bottom:.6rem" role="img"
+      aria-label="${done} of ${vs.length} issues addressed">` +
+    ["resolved","flagged","partially_resolved","unresolved","new_issue"]
+      .filter(k=>counts[k]).map(k=>
+        `<span style="flex:${counts[k]};background:${VERDICT_UI[k].color}"
+          title="${counts[k]} ${VERDICT_UI[k].word}"></span>`).join("") +
+    `</div>`;
+
+  // grouped, human-readable rows with before->after mini bars
+  const order = ["new_issue","unresolved","partially_resolved","flagged","resolved"];
+  const maxRef = Math.max(...vs.map(v=>Math.max(+v.before||0, +v.after||0)), 1);
+  html += [...vs].sort((a,b)=>order.indexOf(a.verdict)-order.indexOf(b.verdict))
+    .map(v=>{
+      const ui = VERDICT_UI[v.verdict] || VERDICT_UI.unresolved;
+      const label = ISSUE_LABEL[v.issue] || v.issue.replaceAll("_"," ");
+      const b = +v.before || 0, a = +v.after || 0;
+      const story =
+        v.verdict === "resolved"  ? `${fmtV(v.issue,v.before)} → none` :
+        v.verdict === "flagged"   ? `${fmtV(v.issue,v.before)} marked with a flag column` :
+        v.verdict === "new_issue" ? `appeared: ${fmtV(v.issue,v.after)}` :
+        a === b                   ? `still ${fmtV(v.issue,v.after)}` :
+                                    `${fmtV(v.issue,v.before)} → ${fmtV(v.issue,v.after)} left`;
+      const w1 = Math.max(3, Math.round(100 * b / maxRef));
+      const w2 = Math.round(100 * a / maxRef);
+      return `<div class="verdict" style="align-items:center">
+        <span style="min-width:0"><span style="color:${ui.color}">${ui.icon}</span>
+          ${esc(label)}
+          <span style="color:var(--accent-2)">${esc(v.col ?? "whole table")}</span>
+          <div style="display:flex;align-items:center;gap:.3rem;margin-top:.2rem">
+            <span style="display:inline-block;width:5.5rem;height:5px;background:var(--surface-2);
+              border-radius:2px;overflow:hidden;flex:none"><span style="display:block;height:100%;
+              width:${w1}%;background:var(--border)"></span></span>
+            <span aria-hidden="true" style="color:var(--text-muted)">→</span>
+            <span style="display:inline-block;width:5.5rem;height:5px;background:var(--surface-2);
+              border-radius:2px;overflow:hidden;flex:none"><span style="display:block;height:100%;
+              width:${w2}%;background:${a ? ui.color : "transparent"}"></span></span>
+            <span class="micro" style="text-transform:none;letter-spacing:0">${esc(story)}</span>
+          </div>
+        </span>
+        <span style="color:${ui.color};white-space:nowrap">${ui.word}</span>
+      </div>`;
+    }).join("");
+  $("#verdicts").innerHTML = html;
 }
 
 /* ---------- timeline + versions ---------- */
