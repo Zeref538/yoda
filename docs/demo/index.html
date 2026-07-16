@@ -1095,12 +1095,12 @@ const _pyReady = (async ()=>{
     say("loading Python runtime…");
     const py = await loadPyodide();
     say("loading pandas (~15 MB, cached after first visit)…");
-    await py.loadPackage(["pandas","openpyxl","pyyaml","micropip"]);
+    await py.loadPackage(["pandas","micropip","sqlite3"]);
     say("installing YODA…");
     const wheel = document.querySelector('meta[name="demo-wheel"]').content;
     await py.runPythonAsync(`
 import micropip
-await micropip.install(["python-dateutil","jsonschema"])
+await micropip.install(["python-dateutil","jsonschema","openpyxl","pyyaml"])
 await micropip.install("${new URL(wheel, location.href).href}", deps=False)
 `);
     const shim = await (await fetch("demo_shim.py")).text();
