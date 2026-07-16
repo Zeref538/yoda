@@ -376,6 +376,8 @@ def fix_dtypes(df: pd.DataFrame, col: str, params: dict | None = None):
                   "false": False, "no": False, "n": False, "f": False, "0": False}
         low = s.astype(str).str.strip().str.lower()
         converted = low.map(truthy)
+        if params.get("as_int"):  # "1 for true and 0 for false"
+            converted = converted.map({True: 1, False: 0})
         n_failed = int((converted.isna() & s.notna()).sum())
         n_changed = int(converted.notna().sum())
         out[col] = converted.where(s.notna(), other=pd.NA)

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" width="240" height="64" role="img" aria-label="YODA — Your Offline Data Agent">
+  <rect width="240" height="64" fill="#0a0c10"/>
+  <g transform="translate(16 16)">
+    <rect x="0" y="0" width="12" height="12" rx="2.2" fill="#3cddc7" opacity="0.4"/>
+    <rect x="16" y="0" width="12" height="12" rx="2.2" fill="#3cddc7" opacity="0.6"/>
+    <rect x="0" y="16" width="12" height="12" rx="2.2" fill="#3cddc7" opacity="0.85"/>
+    <path d="M17 24 l4 4 l9 -11" fill="none" stroke="#7bd0ff" stroke-width="3.4"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="64" y="34" font-family="'JetBrains Mono',ui-monospace,monospace"
+        font-size="26" font-weight="700" letter-spacing="3" fill="#e2e2e8">YODA</text>
+  <text x="65" y="50" font-family="'JetBrains Mono',ui-monospace,monospace"
+        font-size="9.5" letter-spacing="1.5" fill="#859490">YOUR OFFLINE DATA AGENT</text>
+</svg>

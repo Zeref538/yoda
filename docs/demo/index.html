@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YODA — Your Offline Data Agent</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='8' height='8' rx='1.5' fill='%233cddc7' opacity='.4'/%3E%3Crect x='13' y='3' width='8' height='8' rx='1.5' fill='%233cddc7' opacity='.6'/%3E%3Crect x='3' y='13' width='8' height='8' rx='1.5' fill='%233cddc7' opacity='.85'/%3E%3Cpath d='M13.5 17.5 16 20l5.5-6.5' fill='none' stroke='%233cddc7' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   /* "Mission Control" — concept generated with Google Stitch (Technical
      Precision design system), implemented by hand. Fully offline. */
@@ -20,8 +21,20 @@
            "Helvetica Neue",Arial,sans-serif;
     --r:3px;
   }
+  /* light theme: same structure, inverted surfaces, deeper accents */
+  :root[data-theme="light"]{
+    --bg:#f4f5f7; --surface:#ffffff; --surface-2:#eceef1; --border:#c9ced6;
+    --line:#e1e4e9; --text:#1b2027; --text-muted:#5a6572;
+    --accent:#0d8f7e; --accent-dim:rgba(13,143,126,.10);
+    --accent-2:#0b6fb8; --accent-2-dim:rgba(11,111,184,.10);
+    --ok:#0a7f6d; --ok-dim:rgba(10,127,109,.10);
+    --warn:#8a6d00; --warn-dim:rgba(138,109,0,.12);
+    --danger:#b3261e; --danger-dim:rgba(179,38,30,.08);
+  }
+  :root[data-theme="light"] .atmenu{box-shadow:0 8px 24px rgba(0,0,0,.18)}
   *{margin:0;padding:0;box-sizing:border-box}
   html{color-scheme:dark}
+  :root[data-theme="light"]{color-scheme:light}
   /* Readable system sans for UI text; JetBrains Mono stays for data,
      numbers and micro-labels — the technical accent, not the body. */
   body{background:var(--bg);color:var(--text);font-family:var(--sans);
@@ -85,9 +98,12 @@
   header select.model option{background:var(--surface);color:var(--text)}
 
   /* ---------- 3-column stage ---------- */
-  .stage{flex:1;display:grid;grid-template-columns:16.5rem 1fr 19rem;min-height:0}
+  .stage{flex:1;display:grid;min-height:0;
+        grid-template-columns:var(--left-w,16.5rem) 6px 1fr 6px var(--right-w,19rem)}
+  .gutter{cursor:col-resize;background:transparent}
+  .gutter:hover,.gutter.dragging{background:var(--accent-dim)}
   @media (max-width:1100px){.stage{grid-template-columns:14rem 1fr}
-    .right{display:none}}
+    .right,.gutter{display:none}}
   .left,.right{background:var(--surface);overflow-y:auto;padding:1rem;
         display:flex;flex-direction:column;gap:1rem}
   .left{border-right:1px solid var(--border)}
@@ -193,8 +209,9 @@
         gap:3px}
   .entropy i{aspect-ratio:1;border-radius:1px;background:var(--surface-2)}
   .stat-tiles{display:grid;grid-template-columns:1fr 1fr;gap:.45rem}
-  .stat-tiles span{border:1px solid var(--border);border-radius:var(--r);
+  .stat-tiles>span{border:1px solid var(--border);border-radius:var(--r);
         padding:.4rem .55rem;background:var(--surface-2);font-size:.78rem}
+  .stat-tiles>span span{border:none;background:none;padding:0}
   .stat-tiles b{display:block;font-size:.56rem;color:var(--text-muted);
         text-transform:uppercase;letter-spacing:.14em;font-weight:400}
   .bar-row{display:grid;grid-template-columns:minmax(3.5rem,40%) 1fr 2.2rem;
@@ -234,6 +251,17 @@
         color:var(--text);border:1px solid var(--accent);border-radius:var(--r);
         padding:0 .2rem;text-transform:none;letter-spacing:0}
   .view-head{display:flex;align-items:center;gap:.5rem}
+  .atmenu{position:fixed;z-index:60;background:var(--surface-2);
+        border:1px solid var(--accent);border-radius:var(--r);
+        min-width:12rem;max-height:14rem;overflow:auto;
+        font-family:var(--mono);font-size:.74rem;
+        box-shadow:0 8px 24px rgba(0,0,0,.45)}
+  .atitem{padding:.35rem .7rem;cursor:pointer;color:var(--text)}
+  .atitem.hot,.atitem:hover{background:var(--accent-dim);color:var(--accent)}
+  .codebox{font-family:var(--mono);font-size:.72rem;background:var(--bg);
+        border:1px solid var(--border);border-radius:var(--r);padding:.35rem .6rem;
+        margin-top:.3rem;overflow-x:auto;color:var(--accent-2)}
+  .dataview th.haschanges{color:var(--ok);border-bottom:2px solid var(--ok)}
   .dataview td{user-select:none}
   .dataview td.sel{background:var(--accent-2-dim)!important;
         box-shadow:inset 0 0 0 1px var(--accent-2)}
@@ -310,9 +338,12 @@
 
 <header>
   <div class="logo">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor" opacity=".3"/>
+      <rect x="13" y="3" width="8" height="8" rx="1.5" fill="currentColor" opacity=".5"/>
+      <rect x="3" y="13" width="8" height="8" rx="1.5" fill="currentColor" opacity=".75"/>
+      <path d="M13.5 17.5 16 20l5.5-6.5" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>
     YODA
   </div>
   <nav class="tabs" role="tablist">
@@ -328,6 +359,8 @@
   </select>
   <button id="btn-undo" class="ghost hidden" title="Undo last change (Ctrl+Z)">Undo</button>
   <button id="btn-new" class="ghost hidden" title="Start over with a new file">New</button>
+  <button id="btn-theme" class="ghost" title="Toggle light / dark mode"
+          aria-label="Toggle light or dark mode">light</button>
 </header>
 
 <div class="stage">
@@ -335,7 +368,7 @@
   <!-- LEFT: mission control -->
   <div class="left">
     <div class="paneltitle">Mission Control
-      <small>offline agent v0.2.0</small></div>
+      <small>offline agent v0.3.0</small></div>
     <div class="seclabel">history timeline</div>
     <div class="tl" id="timeline">
       <div class="notebox">Load a file to begin. Every AI round, manual edit
@@ -349,6 +382,9 @@
       <button class="small" id="btn-save-version">Save</button>
     </div>
   </div>
+
+  <div class="gutter" id="gutter-left" role="separator" aria-orientation="vertical"
+       aria-label="Resize left panel" tabindex="0"></div>
 
   <!-- CENTER: pipeline -->
   <div class="center" id="center">
@@ -390,12 +426,15 @@
         </div>
         <div class="dataview" id="dataview" aria-label="Data preview"></div>
         <div>
-          <div class="paneltitle" style="font-size:1rem">Pipeline Analysis</div>
+          <div class="paneltitle" style="font-size:1rem">What needs fixing</div>
           <div class="micro" id="analysis-sub"></div>
         </div>
         <div class="cards" id="issue-cards"></div>
 
         <div class="seclabel">ask the agent</div>
+        <div class="micro" style="text-transform:none;letter-spacing:0;margin:-.4rem 0 .1rem">
+          Type <b>@</b> to point at a column, or click a column header to add it.
+          The AI proposes steps — nothing runs until you approve.</div>
         <div class="hintchips" id="hintchips" aria-label="Example instructions">
           <button class="chip" type="button"><b>clean everything</b></button>
           <button class="chip" type="button">remove blank rows</button>
@@ -404,14 +443,14 @@
           <button class="chip" type="button">delete rows where status is inactive</button>
           <button class="chip" type="button">fill missing with the average</button>
           <button class="chip" type="button">remove the outliers</button>
-          <button class="chip" type="button">normalize</button>
+          <button class="chip" type="button">normalize @column into 1/0</button>
         </div>
         <textarea id="instruction"
-          placeholder="optional — e.g. normalize all dates to ISO, but don't touch the email column…"
+          placeholder="e.g. normalize @remote into 1 for true and 0 for false — or leave blank and I'll find what needs fixing"
           aria-label="Instruction for the AI"></textarea>
         <div style="display:flex;gap:.6rem;align-items:center">
           <button class="primary" id="btn-suggest" style="flex:1">Run analysis</button>
-          <span class="micro" id="scope-note"></span>
+          <span class="micro" id="scope-note" style="text-transform:none;letter-spacing:0"></span>
         </div>
         <div id="think" class="hidden thinking"><span class="spinner"></span>
           <span id="think-word" class="grow"></span>
@@ -452,6 +491,24 @@
         <input type="file" id="recipe-file" accept=".json" hidden>
       </div>
       <div id="recipe-info" class="micro"></div>
+
+      <div class="seclabel">how to use a recipe</div>
+      <ol style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;
+          gap:.5rem;font-size:.82rem;line-height:1.5">
+        <li>Clean a file the way you like — approve the AI's steps (and any
+          manual edits count too).</li>
+        <li>Click <b>Save applied steps as recipe</b> above → a
+          <code>yoda_recipe.json</code> downloads. It's just the ordered list
+          of tools + params, no data inside.</li>
+        <li>Next time, either drop a new file here and click
+          <b>Apply a recipe file…</b>, or run it from a terminal:
+          <div class="codebox">yoda clean next_week.csv --recipe yoda_recipe.json</div></li>
+        <li>To auto-clean every file dropped in a folder:
+          <div class="codebox">yoda watch ./inbox --recipe yoda_recipe.json</div>
+          Files that don't match the recipe are quarantined, not guessed at.</li>
+      </ol>
+      <div class="notebox">Recipes are how you turn a one-off cleanup into a
+        repeatable pipeline — same steps, same order, zero AI needed on replay.</div>
     </div>
 
     <!-- exports tab -->
@@ -473,6 +530,9 @@
     </div>
   </div>
 
+  <div class="gutter" id="gutter-right" role="separator" aria-orientation="vertical"
+       aria-label="Resize right panel" tabindex="0"></div>
+
   <!-- RIGHT: local intel -->
   <div class="right">
     <div class="paneltitle">Local Intel
@@ -480,9 +540,9 @@
     <div class="seclabel">session</div>
     <div id="session-stats"><div class="notebox">load a file to begin —
       everything happens in local memory</div></div>
-    <div class="seclabel">privacy monitor</div>
-    <div id="privacy-box" class="notebox">The model receives a statistical
-      profile only — raw cell values never leave this machine.</div>
+    <div class="seclabel">privacy</div>
+    <div id="privacy-box" class="notebox">Your data never leaves this PC.
+      The AI only sees column summaries — never your actual values.</div>
     <div class="seclabel">issue density by column</div>
     <div class="entropy" id="entropy" title="teal = clean, yellow = issues"></div>
     <div class="seclabel">selected column</div>
@@ -517,6 +577,7 @@
 "use strict";
 const $ = s => document.querySelector(s);
 const state = {grid:null, issues:[], suggestions:[], selectedCol:null,
+               selectedCols:[],
                busy:false, verdicts:[], appliedAny:false};
 
 /* ---------- helpers ---------- */
@@ -571,7 +632,8 @@ async function upload(file){
     const fd = new FormData(); fd.append("file", file);
     const d = await (await api("/api/upload",{method:"POST",body:fd})).json();
     state.grid = d.grid; state.issues = d.issues; state.verdicts = [];
-    state.suggestions = []; state.selectedCol = null; state.appliedAny = false;
+    state.suggestions = []; state.selectedCol = null; state.selectedCols = [];
+    state.appliedAny = false;
     $("#filechip").textContent = `${d.name} (${d.n_rows} rows)`;
     ["#filechip","#btn-new"].forEach(s=>$(s).classList.remove("hidden"));
     $("#btn-undo").classList.add("hidden");
@@ -598,7 +660,7 @@ function renderIssueCards(){
     return;
   }
   box.innerHTML = state.issues.map((i,idx)=>`
-    <div class="card${state.selectedCol && i.col===state.selectedCol ? " active":""}"
+    <div class="card${i.col && state.selectedCols.includes(i.col) ? " active":""}"
          data-i="${idx}" tabindex="0" role="button"
          aria-label="${esc(i.issue)} in ${esc(i.col??'whole table')}">
       <div style="display:flex;align-items:baseline;gap:.5rem">
@@ -609,16 +671,94 @@ function renderIssueCards(){
   box.querySelectorAll(".card").forEach(c=>{
     const pick = ()=>{
       const iss = state.issues[+c.dataset.i];
-      state.selectedCol = iss.col || null;
-      $("#scope-note").textContent = iss.col ? `scope: ${iss.col}` : "scope: whole table";
-      renderIssueCards();
-      if(iss.col) loadColStats(iss.col);
-      highlightBufferCol(); renderDataView();
+      if(iss.col) toggleColSelection(iss.col);
+      else $("#scope-note").textContent = "scope: whole table";
     };
     c.addEventListener("click", pick);
     c.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
   });
 }
+
+/* ---------- column selection <-> @mentions (multi-column scope) ---------- */
+function addMention(col){
+  const box = $("#instruction");
+  if(!box.value.toLowerCase().includes(("@"+col).toLowerCase()))
+    box.value = (box.value.trim() ? box.value.replace(/\s+$/,"") + " " : "")
+                + "@" + col + " ";
+}
+function removeMention(col){
+  const box = $("#instruction");
+  box.value = box.value.split("@"+col).join("")
+    .replace(/\s{2,}/g," ").replace(/^\s+/,"");
+}
+function toggleColSelection(col){
+  const i = state.selectedCols.indexOf(col);
+  if(i >= 0){ state.selectedCols.splice(i,1); removeMention(col); }
+  else{ state.selectedCols.push(col); addMention(col); }
+  state.selectedCol = state.selectedCols[state.selectedCols.length-1] || null;
+  syncScope();
+}
+function syncScope(){
+  $("#scope-note").textContent = state.selectedCols.length
+    ? "scope: " + state.selectedCols.join(", ") : "";
+  if(state.selectedCol) loadColStats(state.selectedCol);
+  renderIssueCards(); renderDataView();
+}
+function mentionedCols(){
+  if(!state.grid) return [];
+  const t = $("#instruction").value.toLowerCase();
+  return state.grid.columns.filter(c=>t.includes(("@"+c).toLowerCase()));
+}
+
+/* ---------- @column autocomplete in the ask box ---------- */
+const atMenu = document.createElement("div");
+atMenu.className = "atmenu hidden";
+document.body.appendChild(atMenu);
+let atItems = [], atIdx = 0, atStart = -1;
+function atClose(){ atMenu.classList.add("hidden"); atItems = []; atStart = -1; }
+function atOpen(){
+  const box = $("#instruction");
+  const upto = box.value.slice(0, box.selectionStart);
+  const m = upto.match(/@([\w ]{0,30})$/);
+  if(!m || !state.grid){ atClose(); return; }
+  const q = m[1].toLowerCase();
+  atItems = state.grid.columns
+    .filter(c=>c.toLowerCase().startsWith(q)).slice(0, 8);
+  if(!atItems.length){ atClose(); return; }
+  atStart = box.selectionStart - m[1].length;
+  atIdx = 0;
+  const r = box.getBoundingClientRect();
+  atMenu.style.left = r.left + "px";
+  atMenu.style.top = (r.bottom + 4) + "px";
+  atMenu.innerHTML = atItems.map((c,i)=>
+    `<div class="atitem${i===0?" hot":""}" data-c="${esc(c)}">@${esc(c)}</div>`).join("");
+  atMenu.classList.remove("hidden");
+  atMenu.querySelectorAll(".atitem").forEach(el=>
+    el.addEventListener("mousedown", e=>{e.preventDefault(); atPick(el.dataset.c);}));
+}
+function atPick(col){
+  const box = $("#instruction");
+  const after = box.value.slice(box.selectionStart);
+  box.value = box.value.slice(0, atStart) + col + " " + after;
+  atClose(); box.focus();
+  box.selectionStart = box.selectionEnd = atStart + col.length + 1;
+  if(!state.selectedCols.includes(col)){
+    state.selectedCols.push(col); state.selectedCol = col; syncScope();
+  }
+}
+$("#instruction").addEventListener("input", atOpen);
+$("#instruction").addEventListener("blur", ()=>setTimeout(atClose, 150));
+$("#instruction").addEventListener("keydown", e=>{
+  if(atMenu.classList.contains("hidden")) return;
+  if(e.key==="ArrowDown" || e.key==="ArrowUp"){
+    e.preventDefault();
+    atIdx = (atIdx + (e.key==="ArrowDown" ? 1 : atItems.length-1)) % atItems.length;
+    atMenu.querySelectorAll(".atitem").forEach((el,i)=>
+      el.classList.toggle("hot", i===atIdx));
+  }else if(e.key==="Enter" || e.key==="Tab"){
+    e.preventDefault(); atPick(atItems[atIdx]);
+  }else if(e.key==="Escape"){ atClose(); }
+});
 
 /* ---------- data view (excel-style top preview, 10/50 rows) ---------- */
 let previewN = 10;
@@ -644,7 +784,9 @@ function renderDataView(){
   let html = "<table><thead><tr><th style='cursor:default'></th>";
   g.columns.forEach(c=>{
     const n = issueCount(c);
-    const cls = [c===state.selectedCol?"selected":"", newCols.has(c)?"newcol":""].join(" ");
+    const cls = [state.selectedCols.includes(c)?"selected":"",
+                 newCols.has(c)?"newcol":"",
+                 (changed[c]||[]).length?"haschanges":""].join(" ");
     html += `<th class="${cls}" data-col="${esc(c)}" tabindex="0" role="button"
       aria-label="Column ${esc(c)}${n?`, ${n} issues`:""}">${esc(c)}${
       n?`<span class="cnt">${n}</span>`:""}</th>`;
@@ -667,12 +809,7 @@ function renderDataView(){
   $("#view-note").textContent =
     ` — first ${Math.min(previewN, g.rows.length)} of ${g.n_total_rows} rows`;
   box.querySelectorAll("th[data-col]").forEach(th=>{
-    const pick = ()=>{
-      state.selectedCol = th.dataset.col;
-      $("#scope-note").textContent = `scope: ${th.dataset.col}`;
-      loadColStats(th.dataset.col); renderIssueCards();
-      renderDataView(); highlightBufferCol();
-    };
+    const pick = ()=>toggleColSelection(th.dataset.col);
     th.addEventListener("click", pick);
     th.addEventListener("keydown", e=>{
       if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
@@ -806,8 +943,7 @@ function renderBuffer(){
     <span><b>rows</b>${g.n_total_rows}${delta>0
       ? ` <span style="color:var(--ok)">(-${delta})</span>` : ""}</span>
     <span><b>columns</b>${g.columns.length}</span>
-    <span><b>open issues</b><span style="${openIssues?'color:var(--warn)':''}">
-      ${openIssues}</span></span>
+    <span><b>open issues</b><span style="${openIssues?'color:var(--warn)':''}">${openIssues}</span></span>
     <span><b>changes</b>${state.nEdits||0}</span>
   </div>`;
   renderDataView();
@@ -862,22 +998,52 @@ function renderEntropy(){
 async function loadColStats(col){
   try{
     const d = await (await api("/api/colstats?col="+encodeURIComponent(col))).json();
-    let html = `<div class="micro" style="color:var(--accent-2);margin-bottom:.4rem">${esc(col)}</div>
-      <div class="stat-tiles">
-      <span><b>dtype</b>${esc(d.dtype)}</span><span><b>rows</b>${d.n}</span>
-      <span><b>unique</b>${d.unique}</span>
-      <span><b>nulls</b><span style="${d.nulls?'color:var(--warn)':''}">${d.nulls}</span></span>`;
-    if(d.numeric) html += `<span><b>min</b>${d.numeric.min}</span>
-      <span><b>mean</b>${d.numeric.mean}</span><span><b>max</b>${d.numeric.max}</span>`;
+    let html = `<div class="micro" style="color:var(--accent-2);margin-bottom:.4rem">${esc(col)}
+      <span style="color:var(--text-muted)">· ${esc(d.dtype)}</span></div>`;
+    // fill meter: filled (accent) vs missing (warn)
+    html += `<div class="micro" style="text-transform:none;letter-spacing:0;
+        display:flex;justify-content:space-between;margin-bottom:.2rem">
+        <span>${d.fill_pct}% filled</span>
+        <span style="${d.nulls?'color:var(--warn)':''}">${d.nulls} missing</span></div>
+      <div style="height:7px;display:flex;border-radius:3px;overflow:hidden;
+        border:1px solid var(--border);margin-bottom:.55rem">
+        <span style="flex:${d.fill_pct};background:var(--accent)"></span>
+        <span style="flex:${100-d.fill_pct};background:var(--warn-dim)"></span></div>`;
+    html += `<div class="stat-tiles">
+      <span><b>rows</b>${d.n}</span>
+      <span><b>unique</b>${d.unique} <span style="color:var(--text-muted)">(${d.unique_pct}%)</span></span>`;
+    if(d.numeric) html += `
+      <span><b>min</b>${d.numeric.min}</span><span><b>max</b>${d.numeric.max}</span>
+      <span><b>mean</b>${d.numeric.mean}</span><span><b>median</b>${d.numeric.median}</span>
+      <span><b>std dev</b>${d.numeric.std}</span>
+      <span><b>IQR</b>${d.numeric.q1}–${d.numeric.q3}</span>`;
     html += `</div>`;
+    // box-plot style spread bar for numerics (min|Q1===median===Q3|max)
+    if(d.numeric && d.numeric.max > d.numeric.min){
+      const rng = d.numeric.max - d.numeric.min, pos = x=>100*(x-d.numeric.min)/rng;
+      html += `<div class="seclabel" style="margin-top:.6rem">spread</div>
+        <div style="position:relative;height:22px;margin:.2rem 0 .1rem">
+          <div style="position:absolute;top:10px;left:0;right:0;height:2px;background:var(--border)"></div>
+          <div style="position:absolute;top:5px;height:12px;border-radius:2px;
+            background:var(--accent-dim);border:1px solid var(--accent);
+            left:${pos(d.numeric.q1)}%;width:${Math.max(1,pos(d.numeric.q3)-pos(d.numeric.q1))}%"></div>
+          <div title="median ${d.numeric.median}" style="position:absolute;top:2px;height:18px;
+            width:2px;background:var(--accent-2);left:${pos(d.numeric.median)}%"></div>
+        </div>
+        <div class="micro" style="text-transform:none;letter-spacing:0;
+          display:flex;justify-content:space-between"><span>${d.numeric.min}</span>
+          <span>${d.numeric.max}</span></div>`;
+    }
     const bars = d.histogram || d.top_values;
     if(bars && bars.length){
       const max = Math.max(...bars.map(b=>b.n));
-      html += `<div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.5rem">` +
+      html += `<div class="seclabel" style="margin-top:.6rem">${
+        d.histogram?"distribution":"top values"}</div>
+        <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">` +
         bars.map(b=>`<div class="bar-row">
-        <span class="lbl" title="${esc(b.label??b.value)}">${esc(b.label??b.value)}</span>
+        <span class="lbl" title="${esc(String(b.label??b.value))}">${esc(String(b.label??b.value))}</span>
         <span class="track"><span class="fill" style="width:${Math.max(2,100*b.n/max)}%"></span></span>
-        <span class="n">${b.n}</span></div>`).join("") + "</div>";
+        <span class="n">${b.pct!==undefined?b.pct+"%":b.n}</span></div>`).join("") + "</div>";
     }
     $("#colstats").innerHTML = html;
   }catch(e){}
@@ -949,7 +1115,8 @@ async function suggest(){
     const d = await (await api("/api/plan",{method:"POST",
       headers:{"Content-Type":"application/json"},
       signal: suggestAbort.signal,
-      body:JSON.stringify({model:$("#model").value, col:state.selectedCol,
+      body:JSON.stringify({model:$("#model").value,
+                           cols:[...new Set([...state.selectedCols, ...mentionedCols()])],
                            instruction:$("#instruction").value.trim()})})).json();
     etaLearn(etaKey, (performance.now() - thinkT0) / 1000);
     state.suggestions = d.steps;
@@ -1327,11 +1494,13 @@ async function loadPII(){
     const s = d.summary;
     const riskColor = {high:"var(--danger)",medium:"var(--warn)",
                        low:"var(--ok)",none:"var(--ok)"}[s.highest_risk]||"var(--ok)";
-    $("#privacy-box").innerHTML = `The model receives a statistical profile
-      only — <b>0 raw values</b> ever leave this machine.<br>
-      PII scan: <b>${s.n_columns_with_pii}</b>/${s.n_columns_scanned} columns
-      flagged · highest risk
-      <b style="color:${riskColor}">${esc(s.highest_risk)}</b>`;
+    $("#privacy-box").innerHTML = s.n_columns_with_pii
+      ? `Your data never leaves this PC.<br>
+         <b style="color:${riskColor}">${s.n_columns_with_pii} column${
+         s.n_columns_with_pii===1?"":"s"}</b> look${
+         s.n_columns_with_pii===1?"s":""} like personal info (names, phones,
+         emails) — extra reason it stays local.`
+      : `Your data never leaves this PC. No personal info detected.`;
     $("#pii-status").textContent =
       `pii: ${s.n_columns_with_pii}/${s.n_columns_scanned} cols · risk ${s.highest_risk}`;
     $("#pii-box").innerHTML = d.columns.length ? d.columns.map(f=>{
@@ -1351,6 +1520,59 @@ $("#btn-report").addEventListener("click", async ()=>{
   }catch(e){ toast(e.message); }
 });
 $("#modal-close").addEventListener("click", ()=>$("#modal").classList.add("hidden"));
+
+/* ---------- theme toggle (persisted) ---------- */
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  $("#btn-theme").textContent = t === "light" ? "dark" : "light";
+  localStorage.setItem("yoda_theme", t);
+}
+applyTheme(localStorage.getItem("yoda_theme") || "dark");
+$("#btn-theme").addEventListener("click", ()=>applyTheme(
+  document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light"));
+
+/* ---------- resizable sidebars (persisted) ---------- */
+function makeGutter(id, cssVar, side, min, max){
+  const g = document.getElementById(id);
+  const saved = localStorage.getItem("yoda_" + cssVar);
+  if(saved) document.documentElement.style.setProperty(cssVar, saved);
+  let startX, startW;
+  const onMove = e=>{
+    const dx = e.clientX - startX;
+    let w = side === "left" ? startW + dx : startW - dx;
+    w = Math.max(min, Math.min(max, w));
+    document.documentElement.style.setProperty(cssVar, w + "px");
+  };
+  const onUp = ()=>{
+    g.classList.remove("dragging");
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    document.body.style.userSelect = "";
+    localStorage.setItem("yoda_" + cssVar,
+      getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim());
+  };
+  g.addEventListener("mousedown", e=>{
+    startX = e.clientX;
+    startW = parseFloat(getComputedStyle(
+      document.documentElement).getPropertyValue(cssVar)) ||
+      (side === "left" ? 264 : 304);
+    g.classList.add("dragging"); document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+  g.addEventListener("keydown", e=>{  // keyboard resize
+    if(e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    let w = parseFloat(getComputedStyle(
+      document.documentElement).getPropertyValue(cssVar)) || 264;
+    const step = e.key === "ArrowLeft" ? -16 : 16;
+    w = Math.max(min, Math.min(max, w + (side === "left" ? step : -step)));
+    document.documentElement.style.setProperty(cssVar, w + "px");
+    localStorage.setItem("yoda_" + cssVar, w + "px");
+  });
+}
+makeGutter("gutter-left", "--left-w", "left", 180, 460);
+makeGutter("gutter-right", "--right-w", "right", 200, 520);
 </script>
 
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>

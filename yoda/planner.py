@@ -133,6 +133,10 @@ Plain-language mapping (match on meaning, these are examples not the only phrasi
   -> impute_missing(params={"strategy":"mean|median|mode|constant"}) — an explicit
   user ask is the ONE case where a strategy other than flag_only is allowed.
 - "trim/strip the spaces", "clean up whitespace" -> trim_whitespace
+- "turn/normalize/convert X into 1 for true and 0 for false", "make yes/no
+  into 1/0" -> fix_dtypes(col=X, params={"target": "bool", "as_int": true})
+Users may reference columns as @name (e.g. "@remote") — treat @name exactly
+as the column name "name".
 - "delete/remove rows where X is Y", "drop the inactive customers", "remove rows
   with missing X" -> drop_rows_where(col=X, params={"equals": "Y"} or
   {"is_null": true}); "keep only rows where X is Y" -> add "keep": true
@@ -183,7 +187,12 @@ Tool-choice examples (learn the signal -> tool mapping exactly):
    "remove the outliers in age" -> ONE step
    {"tool": "flag_outliers", "col": "age",
     "params": {"method": "iqr", "action": "drop"}, "reason": "user asked removal"}
-   (the word remove/delete means action "drop"; plain "flag" means no action)"""
+   (the word remove/delete means action "drop"; plain "flag" means no action)
+7. User asks: "normalize @remote column value into 1 for true and 0 for false"
+   -> {"tool": "fix_dtypes", "col": "remote",
+       "params": {"target": "bool", "as_int": true}, "reason": "user asked 1/0"}
+   Whenever a boolean/yes-no column should become 1 and 0 (not True/False),
+   you MUST include "as_int": true. @remote means the column named remote."""
 
 
 class RuleBasedPlanner:
@@ -374,12 +383,14 @@ class LLMPlanner:
             raise
 
     def plan(self, profile: dict, instruction: str | None = None,
-             col: str | None = None) -> list[dict]:
+             col: str | list | None = None) -> list[dict]:
         """`instruction` is an optional user request (e.g. "make these dates
-        ISO"); `col` scopes the plan to one column."""
+        ISO"); `col` scopes the plan to one column (or a list of columns)."""
+        cols = [col] if isinstance(col, str) else list(col or [])
         user = "PROFILE:\n" + json.dumps(profile, indent=1)
-        if col:
-            user += (f"\n\nScope: propose steps ONLY for column '{col}' "
+        if cols:
+            names = ", ".join(f"'{c}'" for c in cols)
+            user += (f"\n\nScope: propose steps ONLY for column(s) {names} "
                      "(plus drop_duplicates/rename_columns if clearly needed).")
         if instruction:
             user += f"\n\nThe user asks: {instruction}"
@@ -413,8 +424,8 @@ class LLMPlanner:
                                  f"Your plan was invalid: {msg}\n"
                                  "Return a corrected JSON plan."})
         fallback = RuleBasedPlanner().plan(profile)
-        if col:
-            fallback = [s for s in fallback if s.get("col") in (col, None)]
+        if cols:
+            fallback = [s for s in fallback if s.get("col") in (*cols, None)]
         self.last_outcome = {"source": "fallback_rule_based",
                              "attempts": self.max_retries, "errors": errors}
         return fallback

@@ -219,6 +219,28 @@ def test_executor_resolves_name_form_drift():
     assert audit3[0]["status"] == "error"
 
 
+def test_fix_dtypes_bool_as_int():
+    fix_dtypes = TOOLS["fix_dtypes"]
+    df = pd.DataFrame({"remote": ["true", "FALSE", "yes", "no", None]})
+    out, _ = fix_dtypes(df, "remote", {"target": "bool", "as_int": True})
+    assert list(out["remote"].dropna()) == [1, 0, 1, 0]
+    out2, _ = fix_dtypes(df, "remote", {"target": "bool"})
+    assert list(out2["remote"].dropna()) == [True, False, True, False]
+
+
+def test_planner_multi_column_scope():
+    from yoda.planner import RuleBasedPlanner
+    df = pd.DataFrame({"a b": [" x", "y ", " z"], "c d": ["1", "2", "bad"],
+                       "clean": [1, 2, 3]})
+    prof = profile(df)
+    plan = RuleBasedPlanner().plan(prof)
+    # simulate the /api/plan multi-col filter
+    cols = ["a b"]
+    scoped = [s for s in plan if s.get("col") in (*cols, None)]
+    assert scoped and all(s.get("col") in (*cols, None) for s in scoped)
+    assert not any(s.get("col") == "c d" for s in scoped)
+
+
 def test_profiler_blank_signals():
     prof = profile(blanky_df())
     assert prof["blank_rows"] == 2

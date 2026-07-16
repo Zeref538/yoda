@@ -1,4 +1,6 @@
-# YODA 🧹 — Your Offline Data Agent
+<img src="docs/logo.svg" alt="YODA — Your Offline Data Agent" width="240">
+
+# YODA — Your Offline Data Agent
 
 > A privacy-first, fully local data-cleaning agent. The LLM never sees a
 > single raw row and **nothing leaves your machine**. The demo runs with

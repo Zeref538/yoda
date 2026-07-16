@@ -179,23 +179,27 @@ def plan(body: dict):
     if "prof" not in S:
         raise HTTPException(400, "upload a file first")
     prof = _cleaned_prof() if S["rounds"] else S["prof"]
-    col = body.get("col")
+    # scope: explicit list (from @mentions / multi-select) or single col
+    cols = [c for c in (body.get("cols") or []) if c in prof["columns"]]
+    if not cols and body.get("col"):
+        cols = [body["col"]]
     instruction = body.get("instruction") or None
 
     if body.get("planner") == "rule_based":
         S["planner"] = RuleBasedPlanner()
         steps = S["planner"].plan(prof)
-        if col:
-            steps = [s for s in steps if s.get("col") in (col, None)]
+        if cols:
+            steps = [s for s in steps if s.get("col") in (*cols, None)]
         outcome = {"source": "rule_based"}
     else:
         # Interactive UI: force thinking off — thinking models return empty
         # content under structured output and burn all retries.
         S["planner"] = LLMPlanner(model=body.get("model", "qwen3.5:4b"),
                                   think=False)
-        steps = S["planner"].plan(prof, instruction=instruction, col=col)
-        if col:  # keep the model honest: never leak steps onto other columns
-            steps = [s for s in steps if s.get("col") in (col, None)]
+        steps = S["planner"].plan(prof, instruction=instruction,
+                                  col=cols or None)
+        if cols:  # keep the model honest: never leak steps onto other columns
+            steps = [s for s in steps if s.get("col") in (*cols, None)]
         outcome = S["planner"].last_outcome
     S["current_prof"] = prof
     return {"steps": steps, "outcome": outcome}
@@ -477,20 +481,37 @@ def colstats(col: str):
     if col not in df.columns:
         raise HTTPException(400, f"unknown column: {col}")
     s = df[col]
+    n = len(s)
     non_null = s.dropna()
-    out: dict = {"col": col, "n": len(s), "nulls": int(s.isna().sum()),
-                 "unique": int(non_null.nunique()), "dtype": str(s.dtype)}
+    n_null = int(s.isna().sum())
+    n_unique = int(non_null.nunique())
+    out: dict = {
+        "col": col, "n": n, "nulls": n_null,
+        "null_pct": round(100 * n_null / n, 1) if n else 0.0,
+        "unique": n_unique,
+        "unique_pct": round(100 * n_unique / len(non_null), 1) if len(non_null) else 0.0,
+        "fill_pct": round(100 * len(non_null) / n, 1) if n else 0.0,
+        "dtype": str(s.dtype),
+    }
     numeric = pd.to_numeric(non_null, errors="coerce").dropna() \
         if not pd.api.types.is_bool_dtype(s) else pd.Series(dtype=float)
     if len(numeric) >= max(1, int(0.9 * len(non_null))) and len(numeric):
-        out["numeric"] = {"min": float(numeric.min()), "max": float(numeric.max()),
-                          "mean": round(float(numeric.mean()), 4)}
+        out["numeric"] = {
+            "min": float(numeric.min()), "max": float(numeric.max()),
+            "mean": round(float(numeric.mean()), 4),
+            "median": round(float(numeric.median()), 4),
+            "std": round(float(numeric.std()), 4) if len(numeric) > 1 else 0.0,
+            "q1": round(float(numeric.quantile(0.25)), 4),
+            "q3": round(float(numeric.quantile(0.75)), 4),
+        }
         binned = pd.cut(numeric, bins=10, duplicates="drop").value_counts(sort=False)
-        out["histogram"] = [{"label": f"{iv.left:g}–{iv.right:g}", "n": int(n)}
-                            for iv, n in binned.items()]
+        out["histogram"] = [{"label": f"{iv.left:g}–{iv.right:g}", "n": int(n_)}
+                            for iv, n_ in binned.items()]
     else:
         vc = non_null.astype(str).value_counts().head(8)
-        out["top_values"] = [{"value": v, "n": int(n)} for v, n in vc.items()]
+        out["top_values"] = [{"value": v, "n": int(c),
+                              "pct": round(100 * c / len(non_null), 1)}
+                             for v, c in vc.items()]
     return out
 
 
