@@ -394,6 +394,8 @@
         </div>
         <div id="think" class="hidden thinking"><span class="spinner"></span>
           <span id="think-word" class="grow"></span>
+          <span id="think-eta" class="micro"
+            style="text-transform:none;letter-spacing:0"></span>
           <button class="ghost small" id="btn-cancel">Cancel</button></div>
         <div id="sugg-error"></div>
 
@@ -887,13 +889,43 @@ const ACTIONS = ["reading column statistics…","scanning format signatures…",
   "consulting the local model…","weighing tool options…","drafting repair steps…",
   "validating JSON against schema…","double-checking column names…"];
 let actionTimer = null, suggestAbort = null;
-function startThinking(){
+/* ---------- learned ETAs (per model, stored locally) ---------- */
+function etaGet(key){
+  const v = parseFloat(localStorage.getItem("yoda_eta_" + key));
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+function etaLearn(key, seconds){
+  const prev = etaGet(key);
+  // exponential moving average so one slow run doesn't dominate
+  const next = prev ? 0.6 * prev + 0.4 * seconds : seconds;
+  localStorage.setItem("yoda_eta_" + key, next.toFixed(2));
+}
+function fmtSecs(s){
+  return s >= 90 ? `${Math.round(s/60)}m ${Math.round(s%60)}s` : `${Math.round(s)}s`;
+}
+
+let thinkT0 = 0, thinkTimer = null;
+function startThinking(etaKey){
   $("#think").classList.remove("hidden");
   let i = 0; $("#think-word").textContent = ACTIONS[0];
   actionTimer = setInterval(()=>{i=(i+1)%ACTIONS.length;
     $("#think-word").textContent = ACTIONS[i];}, 1800);
+  thinkT0 = performance.now();
+  const eta = etaKey ? etaGet(etaKey) : null;
+  const tick = ()=>{
+    const el = (performance.now() - thinkT0) / 1000;
+    $("#think-eta").textContent = eta
+      ? (el <= eta ? `${fmtSecs(el)} · est ~${fmtSecs(eta)}`
+                   : `${fmtSecs(el)} · a bit longer than usual…`)
+      : `${fmtSecs(el)} elapsed`;
+  };
+  tick(); thinkTimer = setInterval(tick, 1000);
 }
-function stopThinking(){ clearInterval(actionTimer); $("#think").classList.add("hidden"); }
+function stopThinking(){
+  clearInterval(actionTimer); clearInterval(thinkTimer);
+  $("#think-eta").textContent = "";
+  $("#think").classList.add("hidden");
+}
 
 $("#btn-suggest").addEventListener("click", suggest);
 $("#hintchips").addEventListener("click", e=>{
@@ -910,7 +942,8 @@ async function suggest(){
   if(state.busy || !state.grid) return; state.busy = true;
   $("#sugg-error").innerHTML = ""; $("#sugg-box").innerHTML = "";
   $("#solutions").classList.add("hidden");
-  $("#btn-suggest").disabled = true; startThinking();
+  const etaKey = "plan_" + $("#model").value;
+  $("#btn-suggest").disabled = true; startThinking(etaKey);
   suggestAbort = new AbortController();
   $("#btn-cancel").onclick = ()=>suggestAbort.abort();
   try{
@@ -919,6 +952,7 @@ async function suggest(){
       signal: suggestAbort.signal,
       body:JSON.stringify({model:$("#model").value, col:state.selectedCol,
                            instruction:$("#instruction").value.trim()})})).json();
+    etaLearn(etaKey, (performance.now() - thinkT0) / 1000);
     state.suggestions = d.steps;
     const src = d.outcome.source==="fallback_rule_based"
       ? "model failed — deterministic fallback"
@@ -974,13 +1008,25 @@ async function applyApproved(){
     .map(el=>state.suggestions[+el.dataset.i]);
   if(!steps.length){ toast("No steps selected."); return; }
   state.busy = true;
-  const btn = $("#btn-approve"); btn.disabled = true; btn.textContent = "Executing…";
+  const btn = $("#btn-approve"); btn.disabled = true;
+  const perStep = etaGet("exec_step");
+  const eta = perStep ? perStep * steps.length : null;
+  const t0 = performance.now();
+  const tick = ()=>{
+    const el = (performance.now() - t0) / 1000;
+    btn.textContent = "Executing… " + (eta
+      ? `${fmtSecs(el)} / ~${fmtSecs(eta)}` : fmtSecs(el));
+  };
+  tick();
+  const execTimer = setInterval(tick, 1000);
   try{
     const d = await (await api("/api/execute",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({steps})})).json();
+    etaLearn("exec_step", (performance.now() - t0) / 1000 / steps.length);
     handleExecuted(d, steps.length);
   }catch(e){ $("#sugg-error").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  clearInterval(execTimer);
   state.busy = false;
 }
 
