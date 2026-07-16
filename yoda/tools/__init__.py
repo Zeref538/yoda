@@ -414,6 +414,9 @@ def impute_missing(df: pd.DataFrame, col: str, params: dict | None = None):
     else:
         raise ValueError(f"unknown impute strategy: {strategy}")
     out[f"{col}_missing"] = out[col].isna()
+    if isinstance(out[col].dtype, pd.CategoricalDtype) \
+            and fill not in out[col].cat.categories:
+        out[col] = out[col].astype(object)  # fill value is a new category
     with pd.option_context("future.no_silent_downcasting", True):
         out[col] = out[col].fillna(fill).infer_objects(copy=False)
     return out, {"rows_affected": n_null, "strategy": strategy, "fill_value": str(fill)}

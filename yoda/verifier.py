@@ -30,7 +30,7 @@ _SIGNALS = {
 }
 # Issues that are handled by adding a flag column, not by changing values.
 _FLAG_HANDLED = {"nulls": "_missing", "outliers": "_outlier"}
-_HELPER_SUFFIXES = ("_missing", "_outlier", "_invalid", "_currency")
+_HELPER_SUFFIXES = ("_missing", "_outlier", "_invalid", "_currency", "_code")
 
 # Which planner tool addresses which signal (for follow-up filtering).
 _SIGNAL_TOOL = {
