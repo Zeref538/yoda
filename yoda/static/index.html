@@ -713,6 +713,37 @@ async function upload(file){
 $("#btn-new").addEventListener("click", ()=>location.reload());
 
 /* ---------- issue cards ---------- */
+// each detected issue knows the prompt that fixes it ({col} -> @column)
+const FIX_PROMPTS = {
+  "duplicate rows": "remove duplicates",
+  "blank rows": "remove blank rows",
+  "empty column": "remove empty columns",
+  "mixed date formats": "standardize the dates in {col}",
+  "phone format chaos": "standardize the phone numbers in {col}",
+  "currency strings": "convert the currency values in {col} to plain numbers",
+  "bools as strings": "convert {col} to real true/false values",
+  "numbers as strings": "convert {col} to numeric",
+  "category casing variants": "unify the categories and casing in {col}",
+  "whitespace / unicode": "trim the whitespace in {col}",
+  "missing values": "flag missing values in {col}",
+  "statistical outliers": "flag the outliers in {col}",
+};
+function issuePrompt(iss){
+  const t = FIX_PROMPTS[iss.issue];
+  if(!t) return null;
+  return iss.col ? t.replace("{col}", "@" + iss.col) : t;
+}
+function appendInstruction(t){
+  const box = $("#instruction");
+  if(!box.value.trim()) box.value = t;
+  else if(!box.value.toLowerCase().includes(t.toLowerCase()))
+    box.value = box.value.replace(/[\s,]+$/,"") + ", " + t;
+}
+function removeInstruction(t){
+  const box = $("#instruction");
+  box.value = box.value.split(t).join("")
+    .replace(/,\s*,/g, ", ").replace(/(^[,\s]+|[,\s]+$)/g, "");
+}
 function renderIssueCards(){
   const box = $("#issue-cards");
   if(!state.issues.length){
@@ -720,8 +751,11 @@ function renderIssueCards(){
       you can still ask the agent below</div>`;
     return;
   }
+  const asked = $("#instruction").value.toLowerCase();
+  const isOn = i => { const p = issuePrompt(i);
+                      return p && asked.includes(p.toLowerCase()); };
   box.innerHTML = state.issues.map((i,idx)=>`
-    <button class="ipill${i.col && state.selectedCols.includes(i.col) ? " active":""}"
+    <button class="ipill${isOn(i) ? " active":""}"
          data-i="${idx}" type="button"
          aria-label="${esc(i.issue)} in ${esc(i.col??'whole table')}">
       <span class="col">${i.col?esc(i.col):"table"}</span>
@@ -731,8 +765,25 @@ function renderIssueCards(){
   box.querySelectorAll(".ipill").forEach(c=>{
     const pick = ()=>{
       const iss = state.issues[+c.dataset.i];
-      if(iss.col) toggleColSelection(iss.col);
-      else $("#scope-note").textContent = "scope: whole table";
+      const phrase = issuePrompt(iss);
+      const box = $("#instruction");
+      const on = phrase && box.value.toLowerCase().includes(phrase.toLowerCase());
+      if(on){                                  // second click: take it back out
+        removeInstruction(phrase);
+        if(iss.col){
+          const i = state.selectedCols.indexOf(iss.col);
+          if(i >= 0) state.selectedCols.splice(i, 1);
+          state.selectedCol = state.selectedCols[state.selectedCols.length-1] || null;
+        }
+      }else{
+        if(phrase) appendInstruction(phrase);  // the prompt that fixes THIS issue
+        if(iss.col && !state.selectedCols.includes(iss.col)){
+          state.selectedCols.push(iss.col);
+          state.selectedCol = iss.col;
+        }
+      }
+      syncScope();
+      box.focus();
     };
     c.addEventListener("click", pick);  // native buttons handle Enter/Space
   });
@@ -783,6 +834,8 @@ function atOpen(){
   const q = m[1].toLowerCase();
   atItems = state.grid.columns
     .filter(c=>c.toLowerCase().startsWith(q)).slice(0, 8);
+  if("whole table".startsWith(q) || "table".startsWith(q))
+    atItems.push("whole table");
   if(!atItems.length){ atClose(); return; }
   atStart = box.selectionStart - m[1].length;
   atIdx = 0;
@@ -798,6 +851,14 @@ function atOpen(){
 function atPick(col){
   const box = $("#instruction");
   const after = box.value.slice(box.selectionStart);
+  if(col === "whole table"){
+    // not a column: swap the "@..." for plain text and clear column scope
+    box.value = box.value.slice(0, atStart - 1) + "the whole table " + after;
+    atClose(); box.focus();
+    box.selectionStart = box.selectionEnd = atStart - 1 + "the whole table ".length;
+    state.selectedCols = []; state.selectedCol = null; syncScope();
+    return;
+  }
   box.value = box.value.slice(0, atStart) + col + " " + after;
   atClose(); box.focus();
   box.selectionStart = box.selectionEnd = atStart + col.length + 1;
@@ -1184,9 +1245,9 @@ $("#hintchips").addEventListener("click", e=>{
   const box = $("#instruction"), t = chip.textContent.trim();
   // chips APPEND (comma-chained) so techniques compose into one instruction;
   // "clean everything" is the exception — it replaces, mixing is contradictory
-  if(t === "clean everything" || !box.value.trim()) box.value = t;
-  else if(!box.value.toLowerCase().includes(t.toLowerCase()))
-    box.value = box.value.replace(/[\s,]+$/,"") + ", " + t;
+  if(t === "clean everything") box.value = t;
+  else appendInstruction(t);
+  renderIssueCards();   // pills light up when their fix is in the box
   box.focus();
 });
 $("#instruction").addEventListener("keydown", e=>{
