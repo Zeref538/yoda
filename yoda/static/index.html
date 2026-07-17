@@ -230,6 +230,22 @@
   .suggestion .on-col{color:var(--accent-2);font-size:.74rem}
   .suggestion .why{color:var(--text-muted);font-size:.76rem;margin-top:.2rem;
         line-height:1.45}
+  .plan-head{display:flex;align-items:center;justify-content:space-between;
+        gap:.6rem;padding:.15rem .1rem}
+  .plan-head .tick,.plan-foot .tick{cursor:pointer}
+  .plan-head .tick{flex-shrink:0;width:1rem;height:1rem;border-radius:4px;
+        border:1px solid var(--input);display:flex;align-items:center;
+        justify-content:center;color:transparent;font-size:.62rem;
+        box-shadow:var(--shadow-sm)}
+  .plan-head .tick.on{background:var(--accent);border-color:var(--accent);
+        color:var(--primary-fg)}
+  .step-n{font-family:var(--mono);font-size:.62rem;color:var(--text-muted);
+        border:1px solid var(--border);border-radius:999px;
+        min-width:1.15rem;text-align:center;line-height:1.5}
+  .pbadge{font-family:var(--mono);font-size:.64rem;color:var(--warn);
+        background:var(--warn-dim);border-radius:var(--r-sm);padding:.05rem .35rem}
+  .plan-foot{display:flex;align-items:center;gap:.7rem;position:sticky;bottom:0;
+        background:var(--bg);padding:.5rem 0 .1rem}
   .thinking{display:flex;align-items:center;gap:.6rem;font-size:.72rem;
         color:var(--accent-2)}
   .spinner{width:.9rem;height:.9rem;border:2px solid var(--border);flex-shrink:0;
@@ -1186,7 +1202,15 @@ function renderSuggestions(src){
     box.innerHTML = `<div class="notebox">the agent proposes no changes here</div>`;
     return;
   }
-  let html = `<div class="micro">${esc(src)}</div>`;
+  let html = `
+    <div class="plan-head">
+      <label style="display:flex;align-items:center;gap:.45rem;cursor:pointer">
+        <span class="tick on" id="sel-all" role="checkbox" aria-checked="true"
+              aria-label="Select all steps">&#10003;</span>
+        <span style="font-weight:600;font-size:.82rem">Proposed plan</span>
+      </label>
+      <span class="micro" style="text-transform:none;letter-spacing:.02em">${esc(src)}</span>
+    </div>`;
   state.suggestions.forEach((s,i)=>{
     const params = Object.keys(s.params||{}).length ? JSON.stringify(s.params) : "";
     html += `
@@ -1194,25 +1218,48 @@ function renderSuggestions(src){
            aria-checked="true" aria-label="Approve: ${esc(s.tool)} on ${esc(s.col??'whole table')}">
         <span class="tick" aria-hidden="true">&#10003;</span>
         <div class="grow">
-          <div><span class="tool">${esc(s.tool)}</span>
-               <span class="on-col">(${esc(s.col??"whole table")})</span>
-               ${params?`<span class="micro" style="color:var(--warn)">${esc(params)}</span>`:""}</div>
+          <div style="display:flex;align-items:center;gap:.45rem;flex-wrap:wrap">
+            <span class="step-n">${i+1}</span>
+            <span class="tool">${esc(s.tool.replaceAll("_"," "))}</span>
+            <span class="on-col">${esc(s.col??"whole table")}</span>
+            ${params?`<code class="pbadge">${esc(params)}</code>`:""}</div>
           <div class="why">${esc(s.reason||"")}</div>
         </div>
       </div>`;
   });
-  html += `<button class="primary" id="btn-approve">Approve &amp; execute</button>
-    <div class="notebox">only selected cards run — deterministic pandas executes;
-    the model never touches your rows</div>`;
+  html += `<div class="plan-foot">
+      <button class="primary" id="btn-approve">Approve &amp; run</button>
+      <span class="micro" style="text-transform:none;letter-spacing:.02em">
+        deterministic pandas runs the steps — the model never touches your rows</span>
+    </div>`;
   box.innerHTML = html;
+  const syncApprove = ()=>{
+    const n = box.querySelectorAll(".suggestion.on").length;
+    const all = n === state.suggestions.length;
+    $("#sel-all").classList.toggle("on", all);
+    $("#sel-all").setAttribute("aria-checked", all);
+    const btn = $("#btn-approve");
+    btn.textContent = n ? `Approve & run ${n} step${n===1?"":"s"}` : "No steps selected";
+    btn.disabled = !n;
+  };
   box.querySelectorAll(".suggestion").forEach(card=>{
     const flip = ()=>{card.classList.toggle("on");
-      card.setAttribute("aria-checked", card.classList.contains("on"));};
+      card.setAttribute("aria-checked", card.classList.contains("on"));
+      syncApprove();};
     card.addEventListener("click", flip);
     card.addEventListener("keydown", e=>{
       if(e.key===" "||e.key==="Enter"){e.preventDefault();flip();}});
   });
+  $("#sel-all").addEventListener("click", ()=>{
+    const on = !$("#sel-all").classList.contains("on");
+    box.querySelectorAll(".suggestion").forEach(card=>{
+      card.classList.toggle("on", on);
+      card.setAttribute("aria-checked", on);
+    });
+    syncApprove();
+  });
   $("#btn-approve").addEventListener("click", applyApproved);
+  syncApprove();
 }
 
 async function applyApproved(){
