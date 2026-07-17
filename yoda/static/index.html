@@ -478,15 +478,17 @@
         <div class="micro" style="text-transform:none;letter-spacing:0;margin:-.4rem 0 .1rem">
           Type <b>@</b> to point at a column, or click a column header to add it.
           The AI proposes steps — nothing runs until you approve.</div>
-        <div class="hintchips" id="hintchips" aria-label="Example instructions">
+        <div class="hintchips" id="hintchips" aria-label="Cleaning techniques — click to add to the instruction">
           <button class="chip" type="button"><b>clean everything</b></button>
-          <button class="chip" type="button">remove blank rows</button>
           <button class="chip" type="button">remove duplicates</button>
-          <button class="chip" type="button">fix the dates</button>
-          <button class="chip" type="button">delete rows where status is inactive</button>
-          <button class="chip" type="button">fill missing with the average</button>
-          <button class="chip" type="button">remove the outliers</button>
-          <button class="chip" type="button">normalize @column into 1/0</button>
+          <button class="chip" type="button">remove blank rows and empty columns</button>
+          <button class="chip" type="button">standardize the dates</button>
+          <button class="chip" type="button">unify categories and casing</button>
+          <button class="chip" type="button">fix numbers stored as text</button>
+          <button class="chip" type="button">flag missing values</button>
+          <button class="chip" type="button">flag the outliers</button>
+          <button class="chip" type="button">validate value ranges</button>
+          <button class="chip" type="button">trim whitespace</button>
         </div>
         <textarea id="instruction"
           placeholder="e.g. normalize @remote into 1 for true and 0 for false — or leave blank and I'll find what needs fixing"
@@ -1137,8 +1139,12 @@ $("#btn-suggest").addEventListener("click", suggest);
 $("#hintchips").addEventListener("click", e=>{
   const chip = e.target.closest(".chip");
   if(!chip) return;
-  const box = $("#instruction");
-  box.value = chip.textContent;
+  const box = $("#instruction"), t = chip.textContent.trim();
+  // chips APPEND (comma-chained) so techniques compose into one instruction;
+  // "clean everything" is the exception — it replaces, mixing is contradictory
+  if(t === "clean everything" || !box.value.trim()) box.value = t;
+  else if(!box.value.toLowerCase().includes(t.toLowerCase()))
+    box.value = box.value.replace(/[\s,]+$/,"") + ", " + t;
   box.focus();
 });
 $("#instruction").addEventListener("keydown", e=>{
