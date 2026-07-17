@@ -24,6 +24,36 @@ playbook: the 4b agent routes **every paraphrased and typo'd cleaning ask
 (20/20)** to the right tool and column, and its rare misses fail conservative
 ([details](#instruction-benchmark-does-it-understand-what-you-ask)).
 
+## Quick start (2 minutes)
+
+```bash
+# 1. get the code (Python 3.11+ required)
+git clone https://github.com/Zeref538/yoda.git
+cd yoda
+pip install -e ".[web]"
+
+# 2. optional but recommended: the AI planner (skip this and YODA
+#    still works, using the deterministic rule-based planner)
+#    install Ollama from https://ollama.com then:
+ollama pull qwen3.5:4b        # ~3.4 GB, runs on a laptop
+
+# 3. clean something
+yoda web                      # web UI at http://127.0.0.1:8000
+# ...or from the terminal:
+yoda clean your_file.csv
+```
+
+No Ollama? Add `--planner rule_based` to any `yoda clean` command, or just
+use the web UI — it tells you which planner it's using. Nothing ever
+requires an internet connection after the one-time model pull.
+
+**Contents:** [Why](#why) · [How it works](#how-it-works) ·
+[Benchmarks](#benchmark-ground-truth-honest-numbers) ·
+[Failure analysis](#failure-analysis-what-the-benchmark-caught-and-what-fixing-it-cost) ·
+[Install & use](#install--use) · [Web UI](#local-web-ui) ·
+[Toolbox](#the-toolbox) · [Privacy](#privacy-guarantees-tested) ·
+[Troubleshooting](#troubleshooting)
+
 ## Why
 
 Every company wants AI on their data; almost none want their data leaving the
@@ -168,13 +198,22 @@ Recruiter-honest findings, not marketing:
 
 ## Install & use
 
-Requires Python 3.11+ and [Ollama](https://ollama.com) with a small model
-(default `qwen3.5:4b`, ~3.4 GB; any JSON-capable instruct model works).
-Inputs: CSV, Excel, SQLite, Parquet.
+**Requirements**
+
+| what | why | needed? |
+|---|---|---|
+| Python 3.11+ | pandas pipeline, CLI, web UI | yes |
+| [Ollama](https://ollama.com) + `qwen3.5:4b` (~3.4 GB, any JSON-capable instruct model works via `--model`) | the AI planner | no — rule-based planner works without it |
+| ~4 GB free RAM | running the 4b model | only for the AI planner |
+
+Inputs: CSV, Excel (`.xlsx`), SQLite, Parquet. Works on Windows, macOS,
+Linux. Zero cloud dependencies — after `ollama pull`, everything runs with
+Wi-Fi off.
 
 ```bash
-pip install -e .
-ollama pull qwen3.5:4b
+git clone https://github.com/Zeref538/yoda.git && cd yoda
+pip install -e ".[web]"       # ".[web]" adds the local web UI; plain "." for CLI only
+ollama pull qwen3.5:4b        # optional (AI planner)
 
 yoda clean data.csv                      # full loop with human approval
 yoda clean data.csv --dry-run            # show the plan, touch nothing
@@ -213,17 +252,21 @@ table:
 
 ### Local web UI
 
-`pip install -e ".[web]"` then `yoda web` — a dark-mode "Mission Control" UI
-(FastAPI + vanilla JS, zero CDNs, works with Wi-Fi off): a pipeline view with
-detected-issue cards, a live data preview at the top (first 10/50 rows —
-changed cells turn green with the old value on hover, new columns cyan), a
-history timeline with revert-to-original and named versions, per-column stats,
-recipes (save/apply), PII scan, and one-file Excel export (data + audit +
-verification). Ask the agent in plain language — *"remove blank rows"*,
-*"change the department to 1,2,3,4 depending on their unique value"*, *"replace
-N/A with nothing in name"* — review its proposed steps, and approve before
-anything runs. Cells are also directly editable (double-click), and everything
-is undoable and audit-logged. The server binds to `127.0.0.1` only; it is a
+`pip install -e ".[web]"` then `yoda web` — a "Mission Control" UI
+(FastAPI + vanilla JS on a shadcn-style design system, dark & light mode,
+zero CDNs, works with Wi-Fi off): a pipeline view with detected-issue pills
+(click one and its fixing prompt is written into the ask box for you), a live
+data preview (changed cells turn green with the old value on hover, new
+columns cyan), Excel-style cell/row selection, a history timeline with
+revert-to-original and named versions, per-column stats, recipes (save/apply),
+PII scan, and one-file Excel export (data + audit + verification). Ask the
+agent in plain language — *"remove blank rows"*, *"change @department to
+1,2,3,4 depending on their unique value"* (type `@` to autocomplete column
+names or "whole table"), *"replace N/A with nothing in name"* — review its
+proposed steps, and approve before anything runs. Cells are also directly
+editable (double-click), and everything is undoable and audit-logged.
+Guardrails are server-side: a run that would delete every row is refused
+outright, and ≥50% row loss gets a loud warning with one-click undo. The server binds to `127.0.0.1` only; it is a
 local tool, never a service.
 
 Outputs land next to your file: `<name>_cleaned.<ext>`, `<name>_audit.jsonl`,
@@ -263,6 +306,21 @@ human asks, and every change stays recoverable.
 - The report generator reuses the same redaction for before/after examples.
 - The planner talks only to `localhost:11434`. Pull the model once, then the
   whole pipeline runs with Wi-Fi off.
+
+## Troubleshooting
+
+- **`yoda: command not found`** — the install script's bin dir isn't on PATH;
+  use `python -m yoda ...` instead, or re-open your terminal.
+- **"Ollama not reachable" / plans fall back to rule-based** — make sure
+  `ollama serve` is running and the model is pulled (`ollama list` should show
+  `qwen3.5:4b`). YODA only ever talks to `localhost:11434`.
+- **Excel files won't open** — `pip install openpyxl` (installed automatically
+  with `.[web]`, but a bare CLI install may lack it).
+- **The model proposes nothing / weird plans** — smaller models (2b) fumble;
+  the benchmark shows why. Use `--model qwen3.5:4b` or larger, or fall back
+  to `--planner rule_based` which handles all mechanical dirt at 100%/97.3%.
+- **Want to see exactly what the LLM receives?** `yoda profile data.csv`
+  prints the redacted profile — the only thing that ever reaches the model.
 
 ---
 
