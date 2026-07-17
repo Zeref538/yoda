@@ -180,7 +180,18 @@
         padding:.3rem 0;border-bottom:1px solid var(--line)}
   .ver-row .nm{color:var(--accent-2)}
 
-  /* ---------- center: cards ---------- */
+  /* ---------- center: issue pills (compact) + cards ---------- */
+  .issue-row{display:flex;flex-wrap:wrap;gap:.4rem}
+  .ipill{display:inline-flex;align-items:center;gap:.45rem;min-height:0;
+        font-size:.74rem;padding:.22rem .3rem .22rem .6rem;
+        border-radius:999px;background:var(--surface);box-shadow:none}
+  .ipill .col{font-family:var(--mono);color:var(--accent-2);font-size:.68rem}
+  .ipill .n{background:var(--warn-dim);color:var(--warn);
+        border:1px solid color-mix(in oklch, var(--warn), transparent 60%);
+        border-radius:999px;font-size:.64rem;font-weight:600;
+        padding:0 .42rem;line-height:1.35}
+  .ipill:hover{border-color:var(--ring)}
+  .ipill.active{border-color:var(--accent);background:var(--accent-dim)}
   .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));
         gap:.8rem}
   .card{background:var(--surface);border:1px solid var(--border);
@@ -219,6 +230,22 @@
   .suggestion .on-col{color:var(--accent-2);font-size:.74rem}
   .suggestion .why{color:var(--text-muted);font-size:.76rem;margin-top:.2rem;
         line-height:1.45}
+  .plan-head{display:flex;align-items:center;justify-content:space-between;
+        gap:.6rem;padding:.15rem .1rem}
+  .plan-head .tick,.plan-foot .tick{cursor:pointer}
+  .plan-head .tick{flex-shrink:0;width:1rem;height:1rem;border-radius:4px;
+        border:1px solid var(--input);display:flex;align-items:center;
+        justify-content:center;color:transparent;font-size:.62rem;
+        box-shadow:var(--shadow-sm)}
+  .plan-head .tick.on{background:var(--accent);border-color:var(--accent);
+        color:var(--primary-fg)}
+  .step-n{font-family:var(--mono);font-size:.62rem;color:var(--text-muted);
+        border:1px solid var(--border);border-radius:999px;
+        min-width:1.15rem;text-align:center;line-height:1.5}
+  .pbadge{font-family:var(--mono);font-size:.64rem;color:var(--warn);
+        background:var(--warn-dim);border-radius:var(--r-sm);padding:.05rem .35rem}
+  .plan-foot{display:flex;align-items:center;gap:.7rem;position:sticky;bottom:0;
+        background:var(--bg);padding:.5rem 0 .1rem}
   .thinking{display:flex;align-items:center;gap:.6rem;font-size:.72rem;
         color:var(--accent-2)}
   .spinner{width:.9rem;height:.9rem;border:2px solid var(--border);flex-shrink:0;
@@ -459,25 +486,25 @@
           </div>
         </div>
         <div class="dataview" id="dataview" aria-label="Data preview"></div>
-        <div>
-          <div class="paneltitle" style="font-size:1rem">What needs fixing</div>
-          <div class="micro" id="analysis-sub"></div>
-        </div>
-        <div class="cards" id="issue-cards"></div>
+        <div class="seclabel">detected issues
+          <span id="analysis-sub" style="letter-spacing:.02em;text-transform:none"></span></div>
+        <div class="issue-row" id="issue-cards"></div>
 
         <div class="seclabel">ask the agent</div>
         <div class="micro" style="text-transform:none;letter-spacing:0;margin:-.4rem 0 .1rem">
           Type <b>@</b> to point at a column, or click a column header to add it.
           The AI proposes steps — nothing runs until you approve.</div>
-        <div class="hintchips" id="hintchips" aria-label="Example instructions">
+        <div class="hintchips" id="hintchips" aria-label="Cleaning techniques — click to add to the instruction">
           <button class="chip" type="button"><b>clean everything</b></button>
-          <button class="chip" type="button">remove blank rows</button>
           <button class="chip" type="button">remove duplicates</button>
-          <button class="chip" type="button">fix the dates</button>
-          <button class="chip" type="button">delete rows where status is inactive</button>
-          <button class="chip" type="button">fill missing with the average</button>
-          <button class="chip" type="button">remove the outliers</button>
-          <button class="chip" type="button">normalize @column into 1/0</button>
+          <button class="chip" type="button">remove blank rows and empty columns</button>
+          <button class="chip" type="button">standardize the dates</button>
+          <button class="chip" type="button">unify categories and casing</button>
+          <button class="chip" type="button">fix numbers stored as text</button>
+          <button class="chip" type="button">flag missing values</button>
+          <button class="chip" type="button">flag the outliers</button>
+          <button class="chip" type="button">validate value ranges</button>
+          <button class="chip" type="button">trim whitespace</button>
         </div>
         <textarea id="instruction"
           placeholder="e.g. normalize @remote into 1 for true and 0 for false — or leave blank and I'll find what needs fixing"
@@ -549,9 +576,8 @@
     <div id="tab-exports" class="hidden" style="display:flex;flex-direction:column;gap:1rem">
       <div class="paneltitle" style="font-size:1rem">Exports</div>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-        <a id="dl" href="/api/download" download><button class="primary">Cleaned CSV</button></a>
-        <a id="dlx" href="/api/download_xlsx" download>
-          <button title="cleaned data + audit log + verification">Excel bundle</button></a>
+        <button class="primary" id="dl">Cleaned CSV</button>
+        <button id="dlx" title="cleaned data + audit log + verification">Excel bundle</button>
         <button id="btn-report">View report</button>
       </div>
       <div class="seclabel">pii scan</div>
@@ -666,6 +692,7 @@ async function upload(file){
     const fd = new FormData(); fd.append("file", file);
     const d = await (await api("/api/upload",{method:"POST",body:fd})).json();
     state.grid = d.grid; state.issues = d.issues; state.verdicts = [];
+    state.profile = d.profile;
     state.suggestions = []; state.selectedCol = null; state.selectedCols = [];
     state.appliedAny = false;
     $("#filechip").textContent = `${d.name} (${d.n_rows} rows)`;
@@ -694,22 +721,20 @@ function renderIssueCards(){
     return;
   }
   box.innerHTML = state.issues.map((i,idx)=>`
-    <div class="card${i.col && state.selectedCols.includes(i.col) ? " active":""}"
-         data-i="${idx}" tabindex="0" role="button"
+    <button class="ipill${i.col && state.selectedCols.includes(i.col) ? " active":""}"
+         data-i="${idx}" type="button"
          aria-label="${esc(i.issue)} in ${esc(i.col??'whole table')}">
-      <div style="display:flex;align-items:baseline;gap:.5rem">
-        <span class="k">issue</span><span class="n">${esc(String(i.count))}</span></div>
-      <div class="t">${esc(i.issue)}</div>
-      <div class="colname">${i.col?esc(i.col):"whole table"}</div>
-    </div>`).join("");
-  box.querySelectorAll(".card").forEach(c=>{
+      <span class="col">${i.col?esc(i.col):"table"}</span>
+      <span>${esc(i.issue)}</span>
+      <span class="n">${esc(String(i.count))}</span>
+    </button>`).join("");
+  box.querySelectorAll(".ipill").forEach(c=>{
     const pick = ()=>{
       const iss = state.issues[+c.dataset.i];
       if(iss.col) toggleColSelection(iss.col);
       else $("#scope-note").textContent = "scope: whole table";
     };
-    c.addEventListener("click", pick);
-    c.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
+    c.addEventListener("click", pick);  // native buttons handle Enter/Space
   });
 }
 
@@ -809,8 +834,8 @@ function renderDataView(){
   const g = state.grid, box = $("#dataview");
   if(!g) return;
   if(previewN === 0){
-    box.classList.add("hidden");
-    $("#view-note").textContent = "";
+    // hidden ≠ blind: show a df.info()-style schema summary instead
+    renderSchemaSummary(box);
     return;
   }
   box.classList.remove("hidden");
@@ -852,6 +877,32 @@ function renderDataView(){
     td.addEventListener("dblclick", ()=>editCellInline(td)));
   wireDataViewSelection(box);
   dvClearSel();
+}
+
+function renderSchemaSummary(box){
+  const g = state.grid, prof = state.profile;
+  box.classList.remove("hidden");
+  $("#view-note").textContent = " — schema (rows hidden)";
+  const firstVal = c => {
+    const ci = g.columns.indexOf(c);
+    for(const r of g.rows){ if(r.cells[ci] !== "") return r.cells[ci]; }
+    return "";
+  };
+  let html = `<table><thead><tr>
+    <th style="cursor:default">column</th><th style="cursor:default">dtype</th>
+    <th style="cursor:default">nulls</th><th style="cursor:default">unique</th>
+    <th style="cursor:default">example</th></tr></thead><tbody>`;
+  g.columns.forEach(c=>{
+    const info = prof?.columns?.[c] || {};
+    const nulls = info.null_pct != null ? info.null_pct + "%" : "—";
+    html += `<tr><td style="color:var(--accent-2)">${esc(c)}</td>
+      <td>${esc(info.dtype ?? "—")}</td>
+      <td style="${parseFloat(info.null_pct)>0?'color:var(--warn)':''}">${esc(String(nulls))}</td>
+      <td>${esc(String(info.n_unique ?? "—"))}</td>
+      <td title="${esc(firstVal(c))}">${esc(firstVal(c))}</td></tr>`;
+  });
+  box.innerHTML = html + "</tbody></table>";
+  dvClearSel();  // no cells on screen -> no live selection or action bar
 }
 
 /* ---------- excel-style selection: drag cells, click row numbers ---------- */
@@ -1130,8 +1181,12 @@ $("#btn-suggest").addEventListener("click", suggest);
 $("#hintchips").addEventListener("click", e=>{
   const chip = e.target.closest(".chip");
   if(!chip) return;
-  const box = $("#instruction");
-  box.value = chip.textContent;
+  const box = $("#instruction"), t = chip.textContent.trim();
+  // chips APPEND (comma-chained) so techniques compose into one instruction;
+  // "clean everything" is the exception — it replaces, mixing is contradictory
+  if(t === "clean everything" || !box.value.trim()) box.value = t;
+  else if(!box.value.toLowerCase().includes(t.toLowerCase()))
+    box.value = box.value.replace(/[\s,]+$/,"") + ", " + t;
   box.focus();
 });
 $("#instruction").addEventListener("keydown", e=>{
@@ -1173,7 +1228,15 @@ function renderSuggestions(src){
     box.innerHTML = `<div class="notebox">the agent proposes no changes here</div>`;
     return;
   }
-  let html = `<div class="micro">${esc(src)}</div>`;
+  let html = `
+    <div class="plan-head">
+      <label style="display:flex;align-items:center;gap:.45rem;cursor:pointer">
+        <span class="tick on" id="sel-all" role="checkbox" aria-checked="true"
+              aria-label="Select all steps">&#10003;</span>
+        <span style="font-weight:600;font-size:.82rem">Proposed plan</span>
+      </label>
+      <span class="micro" style="text-transform:none;letter-spacing:.02em">${esc(src)}</span>
+    </div>`;
   state.suggestions.forEach((s,i)=>{
     const params = Object.keys(s.params||{}).length ? JSON.stringify(s.params) : "";
     html += `
@@ -1181,25 +1244,48 @@ function renderSuggestions(src){
            aria-checked="true" aria-label="Approve: ${esc(s.tool)} on ${esc(s.col??'whole table')}">
         <span class="tick" aria-hidden="true">&#10003;</span>
         <div class="grow">
-          <div><span class="tool">${esc(s.tool)}</span>
-               <span class="on-col">(${esc(s.col??"whole table")})</span>
-               ${params?`<span class="micro" style="color:var(--warn)">${esc(params)}</span>`:""}</div>
+          <div style="display:flex;align-items:center;gap:.45rem;flex-wrap:wrap">
+            <span class="step-n">${i+1}</span>
+            <span class="tool">${esc(s.tool.replaceAll("_"," "))}</span>
+            <span class="on-col">${esc(s.col??"whole table")}</span>
+            ${params?`<code class="pbadge">${esc(params)}</code>`:""}</div>
           <div class="why">${esc(s.reason||"")}</div>
         </div>
       </div>`;
   });
-  html += `<button class="primary" id="btn-approve">Approve &amp; execute</button>
-    <div class="notebox">only selected cards run — deterministic pandas executes;
-    the model never touches your rows</div>`;
+  html += `<div class="plan-foot">
+      <button class="primary" id="btn-approve">Approve &amp; run</button>
+      <span class="micro" style="text-transform:none;letter-spacing:.02em">
+        deterministic pandas runs the steps — the model never touches your rows</span>
+    </div>`;
   box.innerHTML = html;
+  const syncApprove = ()=>{
+    const n = box.querySelectorAll(".suggestion.on").length;
+    const all = n === state.suggestions.length;
+    $("#sel-all").classList.toggle("on", all);
+    $("#sel-all").setAttribute("aria-checked", all);
+    const btn = $("#btn-approve");
+    btn.textContent = n ? `Approve & run ${n} step${n===1?"":"s"}` : "No steps selected";
+    btn.disabled = !n;
+  };
   box.querySelectorAll(".suggestion").forEach(card=>{
     const flip = ()=>{card.classList.toggle("on");
-      card.setAttribute("aria-checked", card.classList.contains("on"));};
+      card.setAttribute("aria-checked", card.classList.contains("on"));
+      syncApprove();};
     card.addEventListener("click", flip);
     card.addEventListener("keydown", e=>{
       if(e.key===" "||e.key==="Enter"){e.preventDefault();flip();}});
   });
+  $("#sel-all").addEventListener("click", ()=>{
+    const on = !$("#sel-all").classList.contains("on");
+    box.querySelectorAll(".suggestion").forEach(card=>{
+      card.classList.toggle("on", on);
+      card.setAttribute("aria-checked", on);
+    });
+    syncApprove();
+  });
   $("#btn-approve").addEventListener("click", applyApproved);
+  syncApprove();
 }
 
 async function applyApproved(){
@@ -1265,6 +1351,7 @@ $("#btn-decode").addEventListener("click", async ()=>{
 function handleExecuted(d, nSteps){
   state.grid = d.grid; state.verdicts = d.verdicts; state.appliedAny = true;
   state.nUntargeted = d.n_untargeted || 0;
+  if(d.profile) state.profile = d.profile;
   const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
   const removed = d.grid.removed_rids.length;
   // failed/skipped steps must be loud, not silent
@@ -1546,6 +1633,43 @@ async function loadPII(){
     }).join("") : `<div class="notebox">no PII detected</div>`;
   }catch(e){}
 }
+/* ---------- export dialog: choose a name (and folder where supported) --- */
+async function exportFile(url, defaultName, ext){
+  const base = ($("#filechip").textContent.split(" (")[0] || "data")
+    .replace(/\.[^.]+$/, "");
+  const suggested = defaultName || (base + "_cleaned" + ext);
+  try{
+    if(window.showSaveFilePicker){
+      // Chromium: real save dialog — user picks folder AND name
+      const handle = await showSaveFilePicker({
+        suggestedName: suggested,
+        types: [{description: ext.toUpperCase().slice(1) + " file",
+                 accept: ext === ".csv" ? {"text/csv": [".csv"]}
+                   : {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"]}}],
+      });
+      const blob = await (await api(url)).blob();
+      const w = await handle.createWritable();
+      await w.write(blob); await w.close();
+      toast("Saved " + handle.name);
+      return;
+    }
+  }catch(e){
+    if(e.name === "AbortError") return;   // user cancelled the dialog
+  }
+  // fallback: ask for a name, download to the browser's download folder
+  const name = prompt("Save as:", suggested);
+  if(name === null) return;
+  const blob = await (await api(url)).blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name.includes(".") ? name : name + ext;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+  toast("Downloaded " + a.download);
+}
+$("#dl").addEventListener("click", ()=>exportFile("/api/download", "", ".csv"));
+$("#dlx").addEventListener("click", ()=>exportFile("/api/download_xlsx", "", ".xlsx"));
+
 $("#btn-report").addEventListener("click", async ()=>{
   try{
     const md = await (await api("/api/report")).text();
