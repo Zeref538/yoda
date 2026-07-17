@@ -180,7 +180,18 @@
         padding:.3rem 0;border-bottom:1px solid var(--line)}
   .ver-row .nm{color:var(--accent-2)}
 
-  /* ---------- center: cards ---------- */
+  /* ---------- center: issue pills (compact) + cards ---------- */
+  .issue-row{display:flex;flex-wrap:wrap;gap:.4rem}
+  .ipill{display:inline-flex;align-items:center;gap:.45rem;min-height:0;
+        font-size:.74rem;padding:.22rem .3rem .22rem .6rem;
+        border-radius:999px;background:var(--surface);box-shadow:none}
+  .ipill .col{font-family:var(--mono);color:var(--accent-2);font-size:.68rem}
+  .ipill .n{background:var(--warn-dim);color:var(--warn);
+        border:1px solid color-mix(in oklch, var(--warn), transparent 60%);
+        border-radius:999px;font-size:.64rem;font-weight:600;
+        padding:0 .42rem;line-height:1.35}
+  .ipill:hover{border-color:var(--ring)}
+  .ipill.active{border-color:var(--accent);background:var(--accent-dim)}
   .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));
         gap:.8rem}
   .card{background:var(--surface);border:1px solid var(--border);
@@ -459,11 +470,9 @@
           </div>
         </div>
         <div class="dataview" id="dataview" aria-label="Data preview"></div>
-        <div>
-          <div class="paneltitle" style="font-size:1rem">What needs fixing</div>
-          <div class="micro" id="analysis-sub"></div>
-        </div>
-        <div class="cards" id="issue-cards"></div>
+        <div class="seclabel">detected issues
+          <span id="analysis-sub" style="letter-spacing:.02em;text-transform:none"></span></div>
+        <div class="issue-row" id="issue-cards"></div>
 
         <div class="seclabel">ask the agent</div>
         <div class="micro" style="text-transform:none;letter-spacing:0;margin:-.4rem 0 .1rem">
@@ -694,22 +703,20 @@ function renderIssueCards(){
     return;
   }
   box.innerHTML = state.issues.map((i,idx)=>`
-    <div class="card${i.col && state.selectedCols.includes(i.col) ? " active":""}"
-         data-i="${idx}" tabindex="0" role="button"
+    <button class="ipill${i.col && state.selectedCols.includes(i.col) ? " active":""}"
+         data-i="${idx}" type="button"
          aria-label="${esc(i.issue)} in ${esc(i.col??'whole table')}">
-      <div style="display:flex;align-items:baseline;gap:.5rem">
-        <span class="k">issue</span><span class="n">${esc(String(i.count))}</span></div>
-      <div class="t">${esc(i.issue)}</div>
-      <div class="colname">${i.col?esc(i.col):"whole table"}</div>
-    </div>`).join("");
-  box.querySelectorAll(".card").forEach(c=>{
+      <span class="col">${i.col?esc(i.col):"table"}</span>
+      <span>${esc(i.issue)}</span>
+      <span class="n">${esc(String(i.count))}</span>
+    </button>`).join("");
+  box.querySelectorAll(".ipill").forEach(c=>{
     const pick = ()=>{
       const iss = state.issues[+c.dataset.i];
       if(iss.col) toggleColSelection(iss.col);
       else $("#scope-note").textContent = "scope: whole table";
     };
-    c.addEventListener("click", pick);
-    c.addEventListener("keydown", e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick();}});
+    c.addEventListener("click", pick);  // native buttons handle Enter/Space
   });
 }
 
