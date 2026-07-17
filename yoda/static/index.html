@@ -576,9 +576,8 @@
     <div id="tab-exports" class="hidden" style="display:flex;flex-direction:column;gap:1rem">
       <div class="paneltitle" style="font-size:1rem">Exports</div>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-        <a id="dl" href="/api/download" download><button class="primary">Cleaned CSV</button></a>
-        <a id="dlx" href="/api/download_xlsx" download>
-          <button title="cleaned data + audit log + verification">Excel bundle</button></a>
+        <button class="primary" id="dl">Cleaned CSV</button>
+        <button id="dlx" title="cleaned data + audit log + verification">Excel bundle</button>
         <button id="btn-report">View report</button>
       </div>
       <div class="seclabel">pii scan</div>
@@ -1634,6 +1633,43 @@ async function loadPII(){
     }).join("") : `<div class="notebox">no PII detected</div>`;
   }catch(e){}
 }
+/* ---------- export dialog: choose a name (and folder where supported) --- */
+async function exportFile(url, defaultName, ext){
+  const base = ($("#filechip").textContent.split(" (")[0] || "data")
+    .replace(/\.[^.]+$/, "");
+  const suggested = defaultName || (base + "_cleaned" + ext);
+  try{
+    if(window.showSaveFilePicker){
+      // Chromium: real save dialog — user picks folder AND name
+      const handle = await showSaveFilePicker({
+        suggestedName: suggested,
+        types: [{description: ext.toUpperCase().slice(1) + " file",
+                 accept: ext === ".csv" ? {"text/csv": [".csv"]}
+                   : {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"]}}],
+      });
+      const blob = await (await api(url)).blob();
+      const w = await handle.createWritable();
+      await w.write(blob); await w.close();
+      toast("Saved " + handle.name);
+      return;
+    }
+  }catch(e){
+    if(e.name === "AbortError") return;   // user cancelled the dialog
+  }
+  // fallback: ask for a name, download to the browser's download folder
+  const name = prompt("Save as:", suggested);
+  if(name === null) return;
+  const blob = await (await api(url)).blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name.includes(".") ? name : name + ext;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+  toast("Downloaded " + a.download);
+}
+$("#dl").addEventListener("click", ()=>exportFile("/api/download", "", ".csv"));
+$("#dlx").addEventListener("click", ()=>exportFile("/api/download_xlsx", "", ".xlsx"));
+
 $("#btn-report").addEventListener("click", async ()=>{
   try{
     const md = await (await api("/api/report")).text();
