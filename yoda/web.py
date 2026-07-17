@@ -265,6 +265,7 @@ def run(body: dict):
     targeted = _targeted_verdicts(verdicts, steps)
     return {
         "audit": json.loads(json.dumps(audit, default=str)),
+        "profile": json.loads(json.dumps(new_prof, default=str)),
         "verdicts": targeted,
         "n_untargeted": len(verdicts) - len(targeted),
         "followup": followup,

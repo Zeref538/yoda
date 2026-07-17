@@ -693,6 +693,7 @@ async function upload(file){
     const fd = new FormData(); fd.append("file", file);
     const d = await (await api("/api/upload",{method:"POST",body:fd})).json();
     state.grid = d.grid; state.issues = d.issues; state.verdicts = [];
+    state.profile = d.profile;
     state.suggestions = []; state.selectedCol = null; state.selectedCols = [];
     state.appliedAny = false;
     $("#filechip").textContent = `${d.name} (${d.n_rows} rows)`;
@@ -834,8 +835,8 @@ function renderDataView(){
   const g = state.grid, box = $("#dataview");
   if(!g) return;
   if(previewN === 0){
-    box.classList.add("hidden");
-    $("#view-note").textContent = "";
+    // hidden ≠ blind: show a df.info()-style schema summary instead
+    renderSchemaSummary(box);
     return;
   }
   box.classList.remove("hidden");
@@ -877,6 +878,32 @@ function renderDataView(){
     td.addEventListener("dblclick", ()=>editCellInline(td)));
   wireDataViewSelection(box);
   dvClearSel();
+}
+
+function renderSchemaSummary(box){
+  const g = state.grid, prof = state.profile;
+  box.classList.remove("hidden");
+  $("#view-note").textContent = " — schema (rows hidden)";
+  const firstVal = c => {
+    const ci = g.columns.indexOf(c);
+    for(const r of g.rows){ if(r.cells[ci] !== "") return r.cells[ci]; }
+    return "";
+  };
+  let html = `<table><thead><tr>
+    <th style="cursor:default">column</th><th style="cursor:default">dtype</th>
+    <th style="cursor:default">nulls</th><th style="cursor:default">unique</th>
+    <th style="cursor:default">example</th></tr></thead><tbody>`;
+  g.columns.forEach(c=>{
+    const info = prof?.columns?.[c] || {};
+    const nulls = info.null_pct != null ? info.null_pct + "%" : "—";
+    html += `<tr><td style="color:var(--accent-2)">${esc(c)}</td>
+      <td>${esc(info.dtype ?? "—")}</td>
+      <td style="${parseFloat(info.null_pct)>0?'color:var(--warn)':''}">${esc(String(nulls))}</td>
+      <td>${esc(String(info.n_unique ?? "—"))}</td>
+      <td title="${esc(firstVal(c))}">${esc(firstVal(c))}</td></tr>`;
+  });
+  box.innerHTML = html + "</tbody></table>";
+  dvClearSel();  // no cells on screen -> no live selection or action bar
 }
 
 /* ---------- excel-style selection: drag cells, click row numbers ---------- */
@@ -1325,6 +1352,7 @@ $("#btn-decode").addEventListener("click", async ()=>{
 function handleExecuted(d, nSteps){
   state.grid = d.grid; state.verdicts = d.verdicts; state.appliedAny = true;
   state.nUntargeted = d.n_untargeted || 0;
+  if(d.profile) state.profile = d.profile;
   const changed = Object.values(d.grid.changed).reduce((a,r)=>a+r.length,0);
   const removed = d.grid.removed_rids.length;
   // failed/skipped steps must be loud, not silent
