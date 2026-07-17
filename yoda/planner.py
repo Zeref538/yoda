@@ -139,7 +139,10 @@ Users may reference columns as @name (e.g. "@remote") — treat @name exactly
 as the column name "name".
 - "delete/remove rows where X is Y", "drop the inactive customers", "remove rows
   with missing X" -> drop_rows_where(col=X, params={"equals": "Y"} or
-  {"is_null": true}); "keep only rows where X is Y" -> add "keep": true
+  {"is_null": true}); "keep only rows where X is Y" -> add "keep": true.
+  CAUTION: if X is in blank_columns or has null_pct near 100, dropping rows
+  where X is missing would delete (nearly) the whole table — the user almost
+  certainly means drop_blank_columns(col=X) instead; propose that.
 - "remove/delete the outliers in X" -> flag_outliers(col=X,
   params={"method":"iqr","action":"drop"}) — drop action only when asked;
   plain "flag the outliers" stays the default flag column.

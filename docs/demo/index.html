@@ -1377,11 +1377,13 @@ function handleExecuted(d, nSteps){
   const removed = d.grid.removed_rids.length;
   // failed/skipped steps must be loud, not silent
   const bad = (d.audit||[]).filter(a=>a.status==="error"||a.status==="skipped");
-  $("#sugg-error").innerHTML = bad.length
+  let alerts = bad.length
     ? `<div class="errbox"><b>${bad.length} step(s) did not run:</b><br>` +
       bad.map(a=>esc(`${a.tool}(${a.col ?? "table"}): ${a.error}`)).join("<br>") +
-      `</div>`
-    : "";
+      `</div>` : "";
+  if(d.row_loss_warning)
+    alerts += `<div class="errbox">${esc(d.row_loss_warning)}</div>`;
+  $("#sugg-error").innerHTML = alerts;
   $("#filechip").textContent = $("#filechip").textContent
       .replace(/\(\d+ rows\)/, `(${d.n_rows_after} rows)`);
   $("#btn-undo").classList.toggle("hidden", !d.undo_depth);

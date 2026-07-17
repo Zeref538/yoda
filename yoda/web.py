@@ -252,6 +252,22 @@ def run(body: dict):
         raise HTTPException(400, f"invalid plan: {exc}")
 
     cleaned, audit = execute(source, steps)
+
+    # Tripwire: a run may thin rows, but never wipe (or nearly wipe) the
+    # table in one go. "Remove rows missing X" on a 100%-empty column would
+    # obediently delete everything — refuse and explain instead.
+    if len(source) and len(cleaned) == 0:
+        raise HTTPException(400,
+            "refused: these steps would delete EVERY row "
+            f"({len(source)} of {len(source)}). If a column is entirely "
+            "empty, drop the column instead of dropping rows where it is "
+            "missing. Nothing was changed.")
+    row_loss = 1 - len(cleaned) / len(source) if len(source) else 0.0
+    row_loss_warning = (
+        f"heads up: this run removed {len(source) - len(cleaned)} of "
+        f"{len(source)} rows ({row_loss:.0%}) — Ctrl+Z if that wasn't the intent"
+        if row_loss >= 0.5 else None)
+
     changed, new_cols, removed, before_vals = _diff(source, cleaned)
     S["cleaned"] = cleaned
     S["rounds"].append({"plan": steps, "audit": audit})
@@ -268,6 +284,7 @@ def run(body: dict):
         "profile": json.loads(json.dumps(new_prof, default=str)),
         "verdicts": targeted,
         "n_untargeted": len(verdicts) - len(targeted),
+        "row_loss_warning": row_loss_warning,
         "followup": followup,
         "round": len(S["rounds"]),
         "n_rows_before": len(S["df"]), "n_rows_after": len(cleaned),

@@ -241,6 +241,26 @@ def test_planner_multi_column_scope():
     assert not any(s.get("col") == "c d" for s in scoped)
 
 
+def test_web_refuses_full_table_wipe():
+    """'Remove rows missing X' on a 100%-empty column must be refused,
+    leaving the data untouched (John hit this live)."""
+    import io
+    from fastapi.testclient import TestClient
+    from yoda.web import app
+    c = TestClient(app)
+    csv = "name,legacy_id\nAna,\nBen,\n"
+    c.post("/api/upload",
+           files={"file": ("t.csv", io.BytesIO(csv.encode()), "text/csv")})
+    r = c.post("/api/execute", json={"steps": [
+        {"tool": "drop_rows_where", "col": "legacy_id",
+         "params": {"is_null": True}, "reason": "user asked"}]})
+    assert r.status_code == 400 and "EVERY row" in r.json()["detail"]
+    r = c.post("/api/execute", json={"steps": [
+        {"tool": "drop_blank_columns", "col": None, "params": {},
+         "reason": "r"}]})
+    assert r.json()["n_rows_after"] == 2          # rows survived the refusal
+
+
 def test_profiler_blank_signals():
     prof = profile(blanky_df())
     assert prof["blank_rows"] == 2
