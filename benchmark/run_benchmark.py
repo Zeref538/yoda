@@ -80,6 +80,14 @@ def write_markdown(scores: list[dict], path: Path, planner: str) -> None:
         tot_cells += o["n_clean_cells_checked"]
     lines.append(f"| **overall** | **{tot_n}** | **{tot_det / tot_n:.1%}** "
                  f"| **{tot_fix / tot_n:.1%}** | **{tot_false / tot_cells:.2%}** |")
+    # The fallback IS the baseline, so a fallen-back dataset scores like the
+    # baseline and quietly lifts the "agent" number. That hid the v3 failure.
+    fell = [s["dataset"] for s in scores
+            if s.get("planner_outcome", {}).get("source") == "fallback_rule_based"]
+    if fell:
+        lines += ["", f"**Not agent output: {len(fell)} of {len(scores)} datasets fell back "
+                  f"to the rule-based planner** ({', '.join(fell)}). The overall row above "
+                  "includes them, so it is not a score for the model."]
 
     lines += ["", "## Per error type (all datasets pooled)", "",
               "| error type | n | detection | fix |", "|---|---:|---:|---:|"]

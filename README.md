@@ -14,7 +14,7 @@ Ollama install).
 
 **Headline result:** on a ground-truth benchmark of **1,589 labeled errors**
 across 6 datasets, YODA's agent (qwen3.5:4b, ~3.4 GB, runs on a laptop) reaches
-**99.1% detection / 96.4% fix rate with a 0.00% false-fix rate** — it never
+**94.3% detection / 94.8% fix rate with a 0.00% false-fix rate** — it never
 "fixed" anything that wasn't broken. A deterministic rule-based baseline scores
 100% / 97.3%, and that comparison — plus how the benchmark found and fixed the
 agent's blind spot — is the honest core of this project
@@ -110,17 +110,22 @@ compares YODA's output against the corruption manifest.
 | planner | detection | fix rate | false-fix rate |
 |---|---:|---:|---:|
 | rule-based baseline (no AI) | **100.0%** | **97.3%** | 0.00% |
-| qwen3.5:4b (agent, v3 prompt) | **99.1%** | **96.4%** | 0.00% |
-| qwen3.5:4b (agent, v2 prompt) | 94.3% | 94.8% | 0.00% |
+| qwen3.5:4b (agent, v2 prompt) | **94.3%** | **94.8%** | 0.00% |
+| qwen3.5:4b (agent, v3 prompt) | not valid (see below) | | |
 | qwen3.5:4b (agent, v1 prompt) | 91.3% | 88.9% | 0.00% |
 | qwen3.5:2b (agent, v2 prompt) | 54.8% | 56.8% | 0.00% |
 | qwen3.5:2b (agent, v1 prompt) | 65.7% | 69.7% | 0.00% |
 
-The v3 prompt (worked examples for the analyst-playbook instructions plus an
-"obey explicit instructions" section) also lifted the autonomous benchmark:
-detection 94.3% → 99.1% — richer signal→tool examples generalized. The 4b
-agent now nearly matches the deterministic baseline while adding the ability
-to follow natural-language instructions the baseline cannot.
+**The v3 prompt run is not a result.** It was first published here as 99.1% /
+96.4%. An audit on 2026-09-30 found that on 5 of the 6 datasets the model's
+reply was cut off mid-JSON three times running (`JSONDecodeError:
+Unterminated string`), so YODA fell back to the rule-based planner, and those
+5 scores are the baseline's, digit for digit. The one dataset the model really
+planned (`inventory`) scored 95.1% / 93.7%, below the baseline's 100% / 98.6%.
+The headline above is the v2 run, whose 6 plans were all genuine model output
+([v2 files](benchmark/results/qwen3.5_4b_v2/), [v3 files](benchmark/results/qwen3.5_4b/),
+`planner_outcome.source` in each `*_score.json` says which planner ran). A v3
+rerun needs Ollama and has not been done.
 
 Per-dataset and per-error-type tables: [benchmark/results/](benchmark/results/).
 Reproduce with `python -m benchmark.run_benchmark --planner llm --model qwen3.5:4b`
@@ -188,8 +193,12 @@ Recruiter-honest findings, not marketing:
   agent's value proposition is ambiguous dirt (semantic category merging,
   domain rules, natural-language column instructions) — which the web UI
   exercises but this benchmark version does not yet score.
-- **Zero fallbacks were needed**: every LLM benchmark plan across both prompt
-  versions was genuine first-attempt model output, schema-valid on try one.
+- **The fallback worked, and that hid a failure.** v1 and v2 needed no
+  fallbacks. v3 fell back on 5 of 6 datasets, and because the fallback is the
+  baseline, the score went *up*. The scorer counted the output, not who made
+  it. Each `results.md` now prints a "Not agent output" line naming every
+  dataset that fell back. The 2b v2 row carries one (`titanic_style`), so its
+  54.8% is, if anything, flattering.
   The retry/fallback machinery exists and is tested (mocked) but real models
   never triggered it. Valid JSON ≠ good plan remains the 2b lesson.
 - **Why fix rate ≠ 100% even for the baseline**: stacked corruptions interact —

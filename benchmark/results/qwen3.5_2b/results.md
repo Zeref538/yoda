@@ -10,6 +10,8 @@
 | inventory | 284 | 15.8% | 18.7% | 0.00% |
 | **overall** | **1589** | **54.8%** | **56.8%** | **0.00%** |
 
+**Not agent output: 1 of 6 datasets fell back to the rule-based planner** (titanic_style). The overall row above includes them, so it is not a score for the model.
+
 ## Per error type (all datasets pooled)
 
 | error type | n | detection | fix |
