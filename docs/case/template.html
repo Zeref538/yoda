@@ -249,8 +249,9 @@
       <i>up</i> when the AI failed. The benchmark counted the output and never checked who
       made it. Now every results table names each dataset that fell back.</p>
       <p data-mode="expert">Each fallen-back v3 plan failed with <code>JSONDecodeError: Unterminated
-      string</code> three times, the reply cut off mid-JSON. The cause is not confirmed; a
-      longer v3 prompt hitting a context or output limit is the first thing to test.
+      string</code> three times, the reply cut off mid-JSON. v3 tripled the system prompt, to about
+      3,000 tokens with the profile, against Ollama's 2k-4k default context on a
+      laptop. Setting <code>num_ctx</code> to 8192 fixed it: zero fallbacks on rerun.
       <code>results.md</code> now prints a "Not agent output" line per fallback.</p>
       <h3>Fixing one blind spot cost points elsewhere</h3>
       <p id="k-cur"></p>
@@ -276,8 +277,7 @@
       most common answer, and asking "which tool, or none?" before planning. Neither adds
       examples copied from the test.</p>
       <div class="note warn"><p class="kicker">Not run yet</p>
-      <p>It needs Ollama, which was not installed on the machine this page was built on.
-      No result is claimed, and none will be until the pre-written rule is met.</p></div>
+      <p>No result is claimed, and none will be until the pre-written rule is met.</p></div>
     </div>
   </div>
 </div>
@@ -363,13 +363,13 @@ const el = (tag, cls, text) => {
   if (text !== undefined) n.textContent = text;
   return n;
 };
-const B = DATA.baseline, V2 = DATA.v2, V1 = DATA.v1, S = DATA.small;
+const B = DATA.baseline, V3 = DATA.v3, V2 = DATA.v2, V1 = DATA.v1, S = DATA.small;
 
 // hero
-$("h-fix").textContent = pct(V2.fix);
-$("h-false").textContent = pct(V2.false_fix, 2);
+$("h-fix").textContent = pct(V3.fix);
+$("h-false").textContent = pct(V3.false_fix, 2);
 $("h-ins").textContent = DATA.ins4.passed + "/" + DATA.ins4.n;
-$("h-n").textContent = num(V2.n);
+$("h-n").textContent = num(V3.n);
 
 // hero demo: the same three rows, as the file holds them and as the model gets them
 (() => {
@@ -394,13 +394,14 @@ $("h-n").textContent = num(V2.n);
 })();
 
 // 01 result
-$("r-x").textContent = pct(V2.fix);
-$("r-intro").textContent = "of " + num(V2.n) + " planted errors repaired by the 4B model, "
-  + "with " + V2.false_fixes + " wrong changes across " + num(V2.cells) + " clean cells.";
+$("r-x").textContent = pct(V3.fix);
+$("r-intro").textContent = "of " + num(V3.n) + " planted errors repaired by the 4B model, "
+  + "with " + V3.false_fixes + " wrong changes across " + num(V3.cells) + " clean cells.";
 $("r-sub").textContent = "One bar per planner, same " + num(B.n) + " errors, same scorer. "
   + "Grey is the rule-based baseline, no AI.";
 const barRows = [
   ["Rules only, no AI", B.fix, "base"],
+  ["4B model, prompt v3", V3.fix, ""],
   ["4B model, prompt v2", V2.fix, ""],
   ["4B model, prompt v1", V1.fix, ""],
   ["2B model, prompt v2", S.fix, ""],
@@ -413,14 +414,14 @@ for (const [label, v, cls] of barRows) {
   $("bars-fix").append(r);
 }
 $("r-cap").textContent = "Detection, for the same rows: rules " + pct(B.detection)
-  + ", 4B v2 " + pct(V2.detection) + ", 4B v1 " + pct(V1.detection) + ", 2B " + pct(S.detection)
+  + ", 4B v3 " + pct(V3.detection) + ", 4B v2 " + pct(V2.detection) + ", 4B v1 " + pct(V1.detection) + ", 2B " + pct(S.detection)
   + ". The 2B run includes " + S.fell_back.length + " dataset that fell back to the rules, so its real score is lower still.";
 $("r-note").innerHTML = "<b>The rules still win here, and that is expected.</b> Every error "
   + "in this benchmark leaves a statistical trace the profiler spots perfectly, so a fixed "
   + "trace-to-tool table is hard to beat. The model's job is the part the table can't do: "
   + "understanding what you ask for in your own words (section 04).";
 const tb = document.querySelector("#types tbody");
-for (const [t, a] of Object.entries(V2.types).sort()) {
+for (const [t, a] of Object.entries(V3.types).sort()) {
   const b = B.types[t], tr = tb.insertRow();
   tr.insertCell().textContent = t.replace(/_/g, " ");
   for (const v of [num(a.n), pct(a.fixed / a.n), pct(b.fixed / b.n)]) {
@@ -460,15 +461,17 @@ for (const m of I4.misses) {
 }
 
 // 05 broke
-const v3 = DATA.v3, [realName, real] = Object.entries(v3.real)[0] || [];
+const v3 = DATA.v3_old, [realName, real] = Object.entries(v3.real)[0] || [];
 $("k-v3").textContent = "Prompt v3 was published as the headline. An audit on the result files "
   + "found that on " + v3.fell_back.length + " of " + v3.n_sets + " datasets the model's reply "
   + "broke three times running and YODA fell back to the rules, so those scores were the "
   + "baseline's, digit for digit."
   + (real ? " The one dataset the model really planned, " + realName.replace(/_/g, " ")
      + ", scored " + pct(real.detection_rate) + " found and " + pct(real.fix_rate)
-     + " fixed, below the rules on the same data. The number was withdrawn and v2, "
-     + "all six plans genuine, is the headline again." : "");
+     + " fixed, below the rules on the same data. The number was withdrawn." : "")
+  + " The cause: the v3 prompt was about three times longer, and the model ran out of room to"
+  + " finish its answer. With a bigger window the rerun got all " + v3.n_sets + " plans from the"
+  + " model on the first try, scoring " + pct(V3.detection) + " found and " + pct(V3.fix) + " fixed.";
 $("k-cur").textContent = "With prompt v1 the model fixed " + pct(V1.types.currency_format.fixed / V1.types.currency_format.n, 0)
   + " of currency errors: it kept picking the number converter, which can't read ₱ signs. "
   + "Four worked examples in v2 took currency to " + pct(V2.types.currency_format.fixed / V2.types.currency_format.n, 0)

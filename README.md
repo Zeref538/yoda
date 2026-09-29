@@ -14,7 +14,7 @@ Ollama install).
 
 **Headline result:** on a ground-truth benchmark of **1,589 labeled errors**
 across 6 datasets, YODA's agent (qwen3.5:4b, ~3.4 GB, runs on a laptop) reaches
-**94.3% detection / 94.8% fix rate with a 0.00% false-fix rate** — it never
+**96.9% detection / 94.1% fix rate with a 0.00% false-fix rate** — it never
 "fixed" anything that wasn't broken. A deterministic rule-based baseline scores
 100% / 97.3%, and that comparison — plus how the benchmark found and fixed the
 agent's blind spot — is the honest core of this project
@@ -110,29 +110,33 @@ compares YODA's output against the corruption manifest.
 | planner | detection | fix rate | false-fix rate |
 |---|---:|---:|---:|
 | rule-based baseline (no AI) | **100.0%** | **97.3%** | 0.00% |
-| qwen3.5:4b (agent, v2 prompt) | **94.3%** | **94.8%** | 0.00% |
-| qwen3.5:4b (agent, v3 prompt) | not valid (see below) | | |
+| qwen3.5:4b (agent, v3 prompt, 8k context) | **96.9%** | **94.1%** | 0.00% |
+| qwen3.5:4b (agent, v3 prompt, default context) | withdrawn (see below) | | |
+| qwen3.5:4b (agent, v2 prompt) | 94.3% | 94.8% | 0.00% |
 | qwen3.5:4b (agent, v1 prompt) | 91.3% | 88.9% | 0.00% |
 | qwen3.5:2b (agent, v2 prompt) | 54.8% | 56.8% | 0.00% |
 | qwen3.5:2b (agent, v1 prompt) | 65.7% | 69.7% | 0.00% |
 
-**The v3 prompt run is not a result.** It was first published here as 99.1% /
-96.4%. An audit on 2026-09-30 found that on 5 of the 6 datasets the model's
-reply was cut off mid-JSON three times running (`JSONDecodeError:
-Unterminated string`), so YODA fell back to the rule-based planner, and those
-5 scores are the baseline's, digit for digit. The one dataset the model really
-planned (`inventory`) scored 95.1% / 93.7%, below the baseline's 100% / 98.6%.
-The headline above is the v2 run, whose 6 plans were all genuine model output
-([v2 files](benchmark/results/qwen3.5_4b_v2/), [v3 files](benchmark/results/qwen3.5_4b/),
+**The first v3 run was withdrawn, and the cause was found.** It was first
+published here as 99.1% / 96.4%. An audit on 2026-09-30 found that on 5 of the 6
+datasets the model's reply was cut off mid-JSON three times running
+(`JSONDecodeError: Unterminated string`), so YODA fell back to the rule-based
+planner, and those 5 scores were the baseline's, digit for digit
+([those files](benchmark/results/qwen3.5_4b_v3_ctx_default/)).
+
+The cause was the context window, the amount of text the model can hold at
+once. The v3 system prompt is about 3x v2's (~2,400 vs ~800 tokens, estimated at
+3.5 characters per token), putting every benchmark prompt near 3,000 tokens,
+and Ollama's default window on a laptop is 2k-4k
+([Ollama docs](https://docs.ollama.com/context-length)). The planner now asks
+for `num_ctx: 8192`. Rerun on 2026-09-30: **all 6 plans genuine model output on
+the first attempt, no fallbacks** ([files](benchmark/results/qwen3.5_4b/);
 `planner_outcome.source` in each `*_score.json` says which planner ran).
 
-**Likely cause, not yet confirmed:** the v3 system prompt is about 3x v2's
-(~2,400 vs ~800 tokens, estimated at 3.5 characters per token), which puts every
-benchmark prompt near 3,000 tokens. Ollama's default context window on a laptop
-is 2k-4k tokens ([Ollama docs](https://docs.ollama.com/context-length)), which
-leaves little room for a 10-20 step JSON plan. The one dataset that survived had
-the shortest prompt. The planner now asks for `num_ctx: 8192`; a v3 rerun needs
-Ollama and has not been done.
+Against v2, detection rose 94.3% → 96.9% and fix rate slipped 94.8% → 94.1%.
+Both are single runs, so a gap under a few points may be run-to-run noise. On 5
+of 6 datasets the model's plan scores exactly like the rules; the exception is
+`retail_orders` (84.1% vs 100%).
 
 Per-dataset and per-error-type tables: [benchmark/results/](benchmark/results/).
 Reproduce with `python -m benchmark.run_benchmark --planner llm --model qwen3.5:4b`

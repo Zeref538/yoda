@@ -74,14 +74,15 @@ def sees() -> dict:
 
 
 def main() -> None:
-    v3 = run("qwen3.5_4b")
+    old = run("qwen3.5_4b_v3_ctx_default")  # the withdrawn run, kept as evidence
     data = {
         "baseline": run("rule_based"),
         "v1": run("qwen3.5_4b_v1"),
         "v2": run("qwen3.5_4b_v2"),
         "small": run("qwen3.5_2b"),
-        "v3": {"fell_back": v3["fell_back"], "n_sets": len(ORDER),
-               "real": {d: v3["datasets"][d] for d in ORDER if d not in v3["fell_back"]}},
+        "v3": run("qwen3.5_4b"),
+        "v3_old": {"fell_back": old["fell_back"], "n_sets": len(ORDER),
+                   "real": {d: old["datasets"][d] for d in ORDER if d not in old["fell_back"]}},
         "ins4": instructions("qwen3.5_4b"),
         "ins2": instructions("qwen3.5_2b"),
         "sees": sees(),
