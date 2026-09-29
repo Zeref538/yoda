@@ -53,6 +53,11 @@ yoda = ["static/*.html"]
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+# Named explicitly: CI installs the newest ruff, and 0.16 widened the default
+# rule set, failing 40 untouched lines. Pinning the rules keeps versions agreeing.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
