@@ -1272,7 +1272,9 @@ async function suggest(){
     state.suggestions = d.steps;
     const src = d.outcome.source==="fallback_rule_based"
       ? "model failed — deterministic fallback"
-      : `${$("#model").value} · valid in ${d.outcome.attempts} attempt(s)`;
+      : d.outcome.source && d.outcome.source!=="llm"
+        ? d.outcome.source   // e.g. the browser demo's rule-based planner, not the model picked
+        : `${$("#model").value} · valid in ${d.outcome.attempts} attempt(s)`;
     renderSuggestions(src);
   }catch(e){
     if(e.name==="AbortError") toast("Cancelled — no changes were made");
