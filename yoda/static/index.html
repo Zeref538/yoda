@@ -668,14 +668,16 @@ document.querySelectorAll("nav.tabs button").forEach(b=>{
 });
 
 /* ---------- installed models ---------- */
-(async ()=>{
+// After DOMContentLoaded and through api(), so the browser demo's api()
+// (added after this script) answers it instead of a 404 from GitHub Pages.
+addEventListener("DOMContentLoaded", async ()=>{
   try{
-    const d = await (await fetch("/api/models")).json();
+    const d = await (await api("/api/models")).json();
     if(d.models.length)
       $("#model").innerHTML = d.models.map(m=>
         `<option value="${esc(m)}"${m==="qwen3.5:4b"?" selected":""}>${esc(m)}</option>`).join("");
   }catch(e){}
-})();
+});
 
 /* ---------- upload ---------- */
 const drop = $("#drop"), fileInput = $("#file");
