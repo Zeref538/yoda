@@ -124,8 +124,15 @@ Unterminated string`), so YODA fell back to the rule-based planner, and those
 planned (`inventory`) scored 95.1% / 93.7%, below the baseline's 100% / 98.6%.
 The headline above is the v2 run, whose 6 plans were all genuine model output
 ([v2 files](benchmark/results/qwen3.5_4b_v2/), [v3 files](benchmark/results/qwen3.5_4b/),
-`planner_outcome.source` in each `*_score.json` says which planner ran). A v3
-rerun needs Ollama and has not been done.
+`planner_outcome.source` in each `*_score.json` says which planner ran).
+
+**Likely cause, not yet confirmed:** the v3 system prompt is about 3x v2's
+(~2,400 vs ~800 tokens, estimated at 3.5 characters per token), which puts every
+benchmark prompt near 3,000 tokens. Ollama's default context window on a laptop
+is 2k-4k tokens ([Ollama docs](https://docs.ollama.com/context-length)), which
+leaves little room for a 10-20 step JSON plan. The one dataset that survived had
+the shortest prompt. The planner now asks for `num_ctx: 8192`; a v3 rerun needs
+Ollama and has not been done.
 
 Per-dataset and per-error-type tables: [benchmark/results/](benchmark/results/).
 Reproduce with `python -m benchmark.run_benchmark --planner llm --model qwen3.5:4b`

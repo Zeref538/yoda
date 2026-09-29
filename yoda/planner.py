@@ -361,7 +361,10 @@ class LLMPlanner:
             "messages": messages,
             "stream": False,
             "format": PLAN_SCHEMA,  # Ollama structured output
-            "options": {"temperature": 0.1},
+            # num_ctx: Ollama's default window is 2k-4k tokens on a laptop. The v3
+            # prompt plus profile is ~3k (estimated), the likely reason v3 plans were
+            # cut off mid-JSON on 5 of 6 benchmark datasets. Unconfirmed until a rerun.
+            "options": {"temperature": 0.1, "num_ctx": 8192},
         }
         if think is not None:
             # Thinking models can return empty content under structured
