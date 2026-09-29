@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 
 from yoda.executor import execute
@@ -24,6 +25,11 @@ from yoda.report import build_report
 from yoda.verifier import diff_profiles, follow_up_plan
 
 app = FastAPI(title="YODA — Your Offline Data Agent", docs_url=None, redoc_url=None)
+# Binding to 127.0.0.1 doesn't stop DNS rebinding: a web page whose domain
+# resolves to 127.0.0.1 could read /api/download. Its requests carry that
+# domain in Host, so only accept our own names. ("testserver" = TestClient.)
+app.add_middleware(TrustedHostMiddleware,
+                   allowed_hosts=["127.0.0.1", "localhost", "testserver"])
 
 STATIC = Path(__file__).parent / "static"
 GRID_MAX_ROWS = 500

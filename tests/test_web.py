@@ -153,3 +153,9 @@ def test_upload_required_first():
     S.clear()
     assert client.post("/api/plan", json={}).status_code == 400
     assert client.post("/api/execute", json={"steps": []}).status_code == 400
+
+
+def test_rejects_foreign_host_header():
+    """DNS-rebinding guard: a request naming another site's host is refused."""
+    assert client.get("/", headers={"host": "evil.example"}).status_code == 400
+    assert client.get("/", headers={"host": "127.0.0.1:8000"}).status_code == 200
