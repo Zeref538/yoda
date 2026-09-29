@@ -16,3 +16,4 @@ report.md
 *_clean.csv
 *_clean.xlsx
 benchmark/runs/
+.playwright-mcp/

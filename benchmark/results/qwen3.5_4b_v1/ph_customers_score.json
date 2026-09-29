@@ -1,0 +1,67 @@
+{
+  "dataset": "ph_customers",
+  "per_type": {
+    "category_casing": {
+      "n": 80,
+      "detected": 80,
+      "fixed": 80,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "currency_format": {
+      "n": 40,
+      "detected": 0,
+      "fixed": 0,
+      "detection_rate": 0.0,
+      "fix_rate": 0.0
+    },
+    "duplicate": {
+      "n": 10,
+      "detected": 10,
+      "fixed": 10,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "mixed_date_format": {
+      "n": 40,
+      "detected": 40,
+      "fixed": 40,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "null": {
+      "n": 40,
+      "detected": 40,
+      "fixed": 40,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "phone_format": {
+      "n": 40,
+      "detected": 40,
+      "fixed": 40,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    },
+    "whitespace": {
+      "n": 40,
+      "detected": 40,
+      "fixed": 40,
+      "detection_rate": 1.0,
+      "fix_rate": 1.0
+    }
+  },
+  "overall": {
+    "n_errors": 290,
+    "detection_rate": 0.8621,
+    "fix_rate": 0.8621,
+    "false_fix_rate": 0.0,
+    "n_clean_cells_checked": 2520,
+    "n_false_fixes": 0
+  },
+  "planner_outcome": {
+    "source": "llm",
+    "attempts": 1,
+    "errors": []
+  }
+}

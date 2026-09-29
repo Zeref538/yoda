@@ -6,7 +6,7 @@
 > single raw row and **nothing leaves your machine**. The demo runs with
 > Wi-Fi off.
 
-**▶ [Try the live browser demo](https://zeref538.github.io/yoda/demo/)** — the
+**[Read the case study](https://zeref538.github.io/yoda/)** · **▶ [Try the live browser demo](https://zeref538.github.io/yoda/demo/)** — the
 whole pipeline (profiler → planner → human gate → executor → verifier) runs in
 *your* browser via WebAssembly; files you load never leave your machine. The
 demo uses the deterministic rule-based planner (the AI planner needs a local
