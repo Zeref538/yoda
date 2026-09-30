@@ -26,10 +26,10 @@ GOOD_PLAN = {"steps": [
 ]}
 
 
-def make_planner(replies: list[str]) -> LLMPlanner:
-    p = LLMPlanner(model="mock")
+def make_planner(replies: list[str], strategy: str = "single") -> LLMPlanner:
+    p = LLMPlanner(model="mock", strategy=strategy)
     it = iter(replies)
-    p._chat = lambda messages, think=None: next(it)
+    p._chat = lambda messages, think=None, **kw: next(it)
     return p
 
 
@@ -91,3 +91,41 @@ def test_full_loop_with_mocked_llm(tmp_path):
     assert set(cleaned["d"]) == {"2021-03-04", "2021-01-01"}
     assert set(cleaned["cat"]) <= {"Yes", "No"}
     assert all(e["status"] == "ok" for e in audit)
+
+
+DATES_ONLY = {"steps": [GOOD_PLAN["steps"][0]]}
+
+
+def test_vote3_keeps_the_majority_plan():
+    """Idea 1: two of three samples agree, so that plan wins over the odd one."""
+    p = make_planner([json.dumps(DATES_ONLY), json.dumps(GOOD_PLAN),
+                      json.dumps(GOOD_PLAN)], strategy="vote3")
+    steps = p.plan(PROF, instruction="fix the dates and the categories")
+    assert len(steps) == 2 and p.last_outcome["votes"] == 2
+
+
+def test_vote3_tie_takes_the_first_sample():
+    empty = json.dumps({"steps": []})
+    p = make_planner([json.dumps(DATES_ONLY), json.dumps(GOOD_PLAN), empty],
+                     strategy="vote3")
+    steps = p.plan(PROF, instruction="fix the dates")
+    assert [s["tool"] for s in steps] == ["normalize_dates"]
+
+
+def test_intent_hint_reaches_the_plan_prompt():
+    """Idea 2: the tool named by the first call is stated in the second."""
+    seen = []
+    p = LLMPlanner(model="mock", strategy="intent")
+    replies = iter([json.dumps({"tool": "none"}), json.dumps({"steps": []})])
+    def fake(messages, think=None, **kw):
+        seen.append(messages[-1]["content"])
+        return next(replies)
+    p._chat = fake
+    assert p.plan(PROF, instruction="what's the weather?") == []
+    assert "does not ask for any cleaning tool" in seen[1]
+
+
+def test_strategy_ignored_without_instruction():
+    """Autonomous plans (the corruption benchmark) always take one sample."""
+    p = make_planner([json.dumps(GOOD_PLAN)], strategy="vote3")
+    assert len(p.plan(PROF)) == 2 and "votes" not in p.last_outcome

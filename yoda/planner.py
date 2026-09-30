@@ -343,7 +343,12 @@ class LLMPlanner:
     def __init__(self, model: str = "qwen3.5:4b",
                  host: str = "http://localhost:11434",
                  max_retries: int = 3, timeout: int = 300,
-                 think: bool | None = None) -> None:
+                 think: bool | None = None, strategy: str = "single") -> None:
+        # strategy applies to instruction requests only (docs/ATTEMPT_NEXT.md):
+        # "single" = one plan (shipped); "vote3" = 3 samples, keep the most common
+        # (tool, col) set; "intent" = ask which one tool first, then plan.
+        assert strategy in ("single", "vote3", "intent"), strategy
+        self.strategy = strategy
         self.model = model
         self.host = host
         self.max_retries = max_retries
@@ -355,16 +360,17 @@ class LLMPlanner:
         self.think = think
         self.last_outcome: dict = {}  # telemetry for reports/benchmark
 
-    def _chat(self, messages: list[dict], think: bool | None = None) -> str:
+    def _chat(self, messages: list[dict], think: bool | None = None,
+              fmt: dict = PLAN_SCHEMA, temperature: float = 0.1) -> str:
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "format": PLAN_SCHEMA,  # Ollama structured output
+            "format": fmt,  # Ollama structured output
             # num_ctx: Ollama's default window is 2k-4k tokens on a laptop. The v3
-            # prompt plus profile is ~3k (estimated), the likely reason v3 plans were
-            # cut off mid-JSON on 5 of 6 benchmark datasets. Unconfirmed until a rerun.
-            "options": {"temperature": 0.1, "num_ctx": 8192},
+            # prompt plus profile is ~3k, and at the default 5 of 6 benchmark plans
+            # were cut off mid-JSON; at 8192 the rerun had no fallbacks.
+            "options": {"temperature": temperature, "num_ctx": 8192},
         }
         if think is not None:
             # Thinking models can return empty content under structured
@@ -400,6 +406,46 @@ class LLMPlanner:
                      "(plus drop_duplicates/rename_columns if clearly needed).")
         if instruction:
             user += f"\n\nThe user asks: {instruction}"
+        think = self.think if self.think is not None else (
+            False if (instruction or col) else None)
+        if instruction and self.strategy == "intent":
+            tool = self._intent(profile, instruction, think)
+            user += (f"\n\nThat request calls for the tool: {tool}." if tool != "none"
+                     else "\n\nThat request does not ask for any cleaning tool: "
+                          'return {"steps": []} unless it clearly does.')
+        if instruction and self.strategy == "vote3":
+            runs = [self._plan_loop(user, profile, cols, instruction, think, 0.7)
+                    for _ in range(3)]
+            keys = [frozenset((s["tool"], s.get("col")) for s in steps)
+                    for steps, _ in runs]
+            best = max(range(3), key=lambda i: (keys.count(keys[i]), -i))  # tie: first
+            steps, self.last_outcome = runs[best]
+            self.last_outcome = {**self.last_outcome, "votes": keys.count(keys[best])}
+            return steps
+        steps, self.last_outcome = self._plan_loop(user, profile, cols, instruction,
+                                                   think, 0.1)
+        return steps
+
+    def _intent(self, profile: dict, instruction: str, think: bool | None) -> str:
+        """Idea 2: one small enum-constrained call naming the tool (or 'none')."""
+        schema = {"type": "object", "additionalProperties": False, "required": ["tool"],
+                  "properties": {"tool": {"type": "string",
+                                          "enum": TOOL_NAMES + ["none"]}}}
+        msgs = [{"role": "system", "content":
+                 "Name the ONE data-cleaning tool this request asks for, from: "
+                 + ", ".join(TOOL_NAMES) + ". Answer none if it is not a "
+                 "data-cleaning request or is too vague to act on."},
+                {"role": "user", "content": "Columns: " + ", ".join(profile["columns"])
+                 + f"\nRequest: {instruction}"}]
+        try:
+            return json.loads(self._chat(msgs, think=think, fmt=schema))["tool"]
+        except (urllib.error.URLError, TimeoutError, OSError,
+                json.JSONDecodeError, KeyError):
+            return "none"
+
+    def _plan_loop(self, user: str, profile: dict, cols: list, instruction,
+                   think: bool | None, temperature: float) -> tuple[list[dict], dict]:
+        """One plan: ask, validate, retry with the error, else fall back."""
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user},
@@ -407,16 +453,12 @@ class LLMPlanner:
         errors: list[str] = []
         for attempt in range(self.max_retries):
             try:
-                raw = self._chat(
-                    messages,
-                    think=self.think if self.think is not None
-                    else (False if (instruction or col) else None))
+                raw = self._chat(messages, think=think, temperature=temperature)
                 plan_obj = json.loads(raw)
                 steps = validate_plan(plan_obj, profile,
                                       allow_impute_fill=bool(instruction))
-                self.last_outcome = {"source": "llm", "attempts": attempt + 1,
-                                     "errors": errors}
-                return steps
+                return steps, {"source": "llm", "attempts": attempt + 1,
+                               "errors": errors}
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 # Ollama unreachable — retrying won't help.
                 errors.append(f"ollama unreachable: {exc}")
@@ -432,6 +474,5 @@ class LLMPlanner:
         fallback = RuleBasedPlanner().plan(profile)
         if cols:
             fallback = [s for s in fallback if s.get("col") in (*cols, None)]
-        self.last_outcome = {"source": "fallback_rule_based",
-                             "attempts": self.max_retries, "errors": errors}
-        return fallback
+        return fallback, {"source": "fallback_rule_based",
+                          "attempts": self.max_retries, "errors": errors}

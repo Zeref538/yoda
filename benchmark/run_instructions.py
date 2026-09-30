@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -253,12 +254,16 @@ def score_case(case: dict, steps: list[dict]) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="qwen3.5:4b")
+    ap.add_argument("--strategy", default="single", choices=["single", "vote3", "intent"])
+    ap.add_argument("--out", default=None,
+                    help="output path without extension (default: results/instructions/<model>)")
     args = ap.parse_args()
 
     prof = profile(fixture())
-    planner = LLMPlanner(model=args.model)
+    planner = LLMPlanner(model=args.model, strategy=args.strategy)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    label = args.model.replace(":", "_")
+    base = Path(args.out) if args.out else RESULTS_DIR / args.model.replace(":", "_")
+    base.parent.mkdir(parents=True, exist_ok=True)
 
     rows, n_pass, extra_total = [], 0, 0
     by_kind: dict[str, dict] = {}
@@ -298,11 +303,14 @@ def main() -> None:
         lines.append(f"| {c['id']} | {c['kind']} | {c['instruction']} "
                      f"| {'yes' if r['result']['pass'] else 'NO'} "
                      f"| {r['result']['extra_steps']} |")
-    (RESULTS_DIR / f"{label}.md").write_text("\n".join(lines) + "\n",
-                                             encoding="utf-8")
-    (RESULTS_DIR / f"{label}.json").write_text(
-        json.dumps(rows, indent=1, default=str), encoding="utf-8")
-    print(f"Wrote {RESULTS_DIR / (label + '.md')}")
+    # temp file + os.replace: a crash mid-write never leaves a half file that
+    # a resumed run would mistake for a finished one.
+    for ext, text in ((".md", "\n".join(lines) + "\n"),
+                      (".json", json.dumps(rows, indent=1, default=str))):
+        tmp = base.with_name(base.name + ext + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, base.with_name(base.name + ext))
+    print(f"Wrote {base}.md")
 
 
 if __name__ == "__main__":
