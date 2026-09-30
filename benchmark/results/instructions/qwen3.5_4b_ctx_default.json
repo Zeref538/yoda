@@ -15,7 +15,7 @@
     "tool": "drop_blank_rows",
     "col": null,
     "params": {},
-    "reason": "user asked to remove blank rows"
+    "reason": "user asked to remove blank/empty rows"
    }
   ],
   "result": {
@@ -44,7 +44,7 @@
     "tool": "drop_blank_rows",
     "col": null,
     "params": {},
-    "reason": "User asked to remove completely empty lines; profile shows 1 blank row"
+    "reason": "User requested removal of completely empty rows (blank_rows > 0)"
    }
   ],
   "result": {
@@ -73,7 +73,7 @@
     "tool": "drop_blank_rows",
     "col": null,
     "params": {},
-    "reason": "user asked to remove blank rows"
+    "reason": "user asked to remove blank/empty rows"
    }
   ],
   "result": {
@@ -169,7 +169,7 @@
      "find": "Sales",
      "replace": "SLS"
     },
-    "reason": "user asked to replace 'Sales' with 'SLS'"
+    "reason": "user asked to replace Sales with SLS"
    }
   ],
   "result": {
@@ -238,7 +238,7 @@
     "params": {
      "start": 1
     },
-    "reason": "user asked to map department values to integers 1-4"
+    "reason": "user asked to label-encode categories as integers"
    }
   ],
   "result": {
@@ -270,7 +270,7 @@
     "params": {
      "start": 1
     },
-    "reason": "user asked to turn city into numbers"
+    "reason": "user asked to turn city values into numbers"
    }
   ],
   "result": {
@@ -334,7 +334,7 @@
     "params": {
      "start": 1
     },
-    "reason": "user asked to convert city column values to numbers based on unique values"
+    "reason": "user asked to convert city column values into numbers (label-encoding)"
    }
   ],
   "result": {
@@ -363,7 +363,7 @@
     "tool": "drop_duplicates",
     "col": null,
     "params": {},
-    "reason": "User asked to remove duplicates; profile shows 1 full-row duplicate."
+    "reason": "User asked to remove duplicates; profile shows full_row duplicate count of 1"
    }
   ],
   "result": {
@@ -392,7 +392,7 @@
     "tool": "drop_duplicates",
     "col": null,
     "params": {},
-    "reason": "User requested to remove duplicate rows (full_row > 0)"
+    "reason": "User requested to remove duplicate rows (full_row=1 detected in profile)"
    }
   ],
   "result": {
@@ -422,7 +422,7 @@
     "tool": "normalize_dates",
     "col": "birthday",
     "params": {},
-    "reason": "User asked to fix dates; profile shows mixed formats (ISO, US, long) and nulls"
+    "reason": "User asked to fix dates; profile shows mixed formats (ISO, US, long) and nulls requiring handling."
    }
   ],
   "result": {
@@ -452,7 +452,7 @@
     "tool": "normalize_dates",
     "col": "birthday",
     "params": {},
-    "reason": "Profile shows mixed date formats (ISO, US, long) in the birthday column requiring unification."
+    "reason": "Profile shows mixed date formats (ISO, US, long) in 'birthday' that need unification to ISO 8601."
    }
   ],
   "result": {
@@ -482,7 +482,7 @@
     "tool": "normalize_phone",
     "col": "phone",
     "params": {},
-    "reason": "User asked to standardize phone numbers; profile shows mixed formats (local, intl, dashed, spaced) and numeric_as_string values requiring E.164 conversion."
+    "reason": "User asked to standardize phone formats; profile shows mixed local/intl/dashed/spaced formats."
    }
   ],
   "result": {
@@ -512,7 +512,7 @@
     "tool": "normalize_currency",
     "col": "price",
     "params": {},
-    "reason": "User requested cleaning of peso signs and commas; profile shows currency_like_values (\u20b1/PHP prefixes) and numeric_as_string values requiring conversion to float."
+    "reason": "User requested cleaning of 'peso signs and commas' (currency symbols like \u20b1/PHP) in the price column; tool converts currency strings to float + currency."
    }
   ],
   "result": {
@@ -542,7 +542,7 @@
     "tool": "standardize_categories",
     "col": "status",
     "params": {},
-    "reason": "user asked to make status casing consistent; profile shows 5 unique values with mixed casing (ACTIVE, Active, INACTIVE, etc.)"
+    "reason": "user asked to unify casing variants in 'status' (ACTIVE/Active/inactive)"
    }
   ],
   "result": {
@@ -572,7 +572,7 @@
     "tool": "standardize_categories",
     "col": "status",
     "params": {},
-    "reason": "User requested to unify casing variants (Active/active/ACTIVE) into a single category."
+    "reason": "User requested to unify casing variants (Active/active/ACTIVE) into a single canonical category."
    }
   ],
   "result": {
@@ -607,7 +607,7 @@
     "params": {
      "target": "numeric"
     },
-    "reason": "User requested conversion of 'qty' from text to numeric; profile shows 9 numeric-as-string values."
+    "reason": "User requested conversion of 'qty' from string to numeric; profile shows 9 values are plain numeric strings."
    }
   ],
   "result": {
@@ -642,7 +642,7 @@
     "params": {
      "strategy": "mean"
     },
-    "reason": "User explicitly requested filling missing values in 'age' with the average (mean)."
+    "reason": "User explicitly requested filling missing values in 'age' using the mean (average)."
    }
   ],
   "result": {
@@ -745,7 +745,7 @@
     "params": {
      "method": "iqr"
     },
-    "reason": "user asked to flag ages outside 0-120 range"
+    "reason": "user asked to flag ages; using IQR is the default method for this tool when no specific bounds were provided in the instruction, though the user's '0 to 120' constraint suggests a range check. However, since `validate_rule` requires explicit min/max params and the prompt specifically said 'flag', we use `flag_outliers`. Note: The profile shows age is already float64 with mean ~31 and std ~7.5; IQR flagging will catch values outside 2*IQR from Q1/Q3."
    }
   ],
   "result": {
@@ -775,7 +775,7 @@
     "tool": "trim_whitespace",
     "col": "name",
     "params": {},
-    "reason": "user asked to strip extra spaces; profile shows 5 whitespace issues in 'name'"
+    "reason": "user asked to remove whitespace; profile shows 5 instances of leading/trailing spaces"
    }
   ],
   "result": {
@@ -805,17 +805,31 @@
   },
   "steps": [
    {
-    "tool": "drop_rows_where",
+    "tool": "drop_blank_rows",
+    "col": null,
+    "params": {},
+    "reason": "Profile shows blank_rows > 0"
+   },
+   {
+    "tool": "standardize_categories",
     "col": "status",
+    "params": {},
+    "reason": "Casing variants exist in status column (ACTIVE/Active/etc.) to ensure consistent matching for the user's request."
+   },
+   {
+    "tool": "drop_blank_columns",
+    "col": null,
     "params": {
-     "equals": "Inactive"
+     "columns": [
+      "note"
+     ]
     },
-    "reason": "user asked to delete rows where status is Inactive"
+    "reason": "User asked to delete rows where status is Inactive; note column was already flagged as blank in profile but explicit deletion requested by context of cleaning unnecessary columns"
    }
   ],
   "result": {
-   "pass": true,
-   "extra_steps": 0
+   "pass": false,
+   "extra_steps": 3
   },
   "outcome": {
    "source": "llm",
@@ -845,7 +859,7 @@
     "params": {
      "equals": "HR"
     },
-    "reason": "user asked to remove rows where department is HR"
+    "reason": "user asked to remove rows where department equals 'HR'"
    }
   ],
   "result": {
@@ -875,17 +889,23 @@
   },
   "steps": [
    {
+    "tool": "drop_blank_rows",
+    "col": null,
+    "params": {},
+    "reason": "User asked to remove rows with missing data; combined with 'remove rows where X is Y' logic for specific columns."
+   },
+   {
     "tool": "drop_rows_where",
     "col": "age",
     "params": {
      "is_null": true
     },
-    "reason": "user asked to remove rows where age is missing"
+    "reason": "Explicit user instruction: 'remove the rows that have no age'."
    }
   ],
   "result": {
    "pass": true,
-   "extra_steps": 0
+   "extra_steps": 1
   },
   "outcome": {
    "source": "llm",
@@ -925,10 +945,8 @@
   },
   "outcome": {
    "source": "llm",
-   "attempts": 2,
-   "errors": [
-    "PlanValidationError: step 0: column '@department' does not exist in the profile"
-   ]
+   "attempts": 1,
+   "errors": []
   }
  },
  {
@@ -1095,7 +1113,7 @@
      "find": "Cruz",
      "replace": "Crus"
     },
-    "reason": "user asked to replace 'Cruz' with 'Crus'"
+    "reason": "user asked to replace all occurrences of 'Cruz' with 'Crus'"
    }
   ],
   "result": {
@@ -1130,7 +1148,7 @@
     "params": {
      "method": "iqr"
     },
-    "reason": "user asked to remove outliers in age"
+    "reason": "user asked to identify/remove outliers; flagging is required first"
    }
   ],
   "result": {
@@ -1212,7 +1230,7 @@
     "tool": "drop_blank_columns",
     "col": "phone",
     "params": {},
-    "reason": "user asked to delete the phone column"
+    "reason": "user asked to drop the phone column"
    }
   ],
   "result": {
@@ -1236,32 +1254,46 @@
    {
     "tool": "rename_columns",
     "col": null,
-    "params": {},
-    "reason": "Standardize column names to snake_case for consistency."
+    "params": {
+     "case": "snake_case"
+    },
+    "reason": "Standardize column names to snake_case (e.g., 'birthday' -> 'birthday', though they are already mostly correct, this ensures consistency if any mixed case exists or for uniformity). *Correction*: Looking closely at the profile keys provided in the JSON input `department`, `city`... these ARE already snake_case. However, standard practice often involves ensuring strict lowercase with underscores. Let's re-evaluate based on 'make data look better'. The columns are fine. I will skip rename if they are perfect.\n\nWait, looking at the profile keys: `"
    },
    {
     "tool": "trim_whitespace",
     "col": "name",
     "params": {},
-    "reason": "5 whitespace issues detected in the 'name' column."
+    "reason": "5 whitespace issues detected in name column"
    },
    {
     "tool": "normalize_dates",
     "col": "birthday",
-    "params": {},
-    "reason": "Mixed date formats (ISO, US, long) present; unify to ISO 8601."
+    "params": {
+     "method": "iso"
+    },
+    "reason": "Mixed date formats (ISO/US/Long) present; unify to ISO 8601"
    },
    {
     "tool": "normalize_phone",
     "col": "phone",
-    "params": {},
-    "reason": "Multiple phone formats (local, intl, dashed, spaced) and numeric-as-string values detected; convert to E.164."
+    "params": {
+     "format": "e164"
+    },
+    "reason": "Multiple phone formats detected (local/intl/dashed/spaced); convert to E.164"
+   },
+   {
+    "tool": "standardize_categories",
+    "col": "status",
+    "params": {
+     "case": "upper"
+    },
+    "reason": "Casing variants exist ('ACTIVE', 'Active'...); unify to uppercase for consistency"
    },
    {
     "tool": "normalize_currency",
     "col": "price",
     "params": {},
-    "reason": "9 currency-like values (\u20b1/PHP prefixes) found; extract float and currency code."
+    "reason": "9 currency-like values (\u20b1/PHP) detected; convert to float + currency column"
    },
    {
     "tool": "fix_dtypes",
@@ -1269,13 +1301,7 @@
     "params": {
      "target": "numeric"
     },
-    "reason": "9 numeric-as-string values detected in 'qty'; coerce to numeric type."
-   },
-   {
-    "tool": "standardize_categories",
-    "col": "status",
-    "params": {},
-    "reason": "5 casing variants (ACTIVE, Active, etc.) exist; fold to canonical form."
+    "reason": "Numeric strings present ('10', '5'...); coerce to numeric type"
    },
    {
     "tool": "impute_missing",
@@ -1283,7 +1309,7 @@
     "params": {
      "strategy": "flag_only"
     },
-    "reason": "10% null percentage; flag missing values instead of filling."
+    "reason": "20% nulls in department column; flag missing values instead of filling"
    },
    {
     "tool": "impute_missing",
@@ -1291,7 +1317,15 @@
     "params": {
      "strategy": "flag_only"
     },
-    "reason": "10% null percentage; flag missing values instead of filling."
+    "reason": "10% nulls in city column; flag missing values"
+   },
+   {
+    "tool": "impute_missing",
+    "col": "status",
+    "params": {
+     "strategy": "flag_only"
+    },
+    "reason": "10% nulls in status column; flag missing values"
    },
    {
     "tool": "impute_missing",
@@ -1299,7 +1333,7 @@
     "params": {
      "strategy": "flag_only"
     },
-    "reason": "10% null percentage; flag missing values instead of filling."
+    "reason": "10% nulls in birthday column; flag missing values"
    },
    {
     "tool": "impute_missing",
@@ -1307,7 +1341,7 @@
     "params": {
      "strategy": "flag_only"
     },
-    "reason": "10% null percentage; flag missing values instead of filling."
+    "reason": "10% nulls in phone column; flag missing values"
    },
    {
     "tool": "impute_missing",
@@ -1315,7 +1349,7 @@
     "params": {
      "strategy": "flag_only"
     },
-    "reason": "10% null percentage; flag missing values instead of filling."
+    "reason": "10% nulls in price column; flag missing values"
    },
    {
     "tool": "impute_missing",
@@ -1323,7 +1357,7 @@
     "params": {
      "strategy": "flag_only"
     },
-    "reason": "10% null percentage; flag missing values instead of filling."
+    "reason": "10% nulls in qty column; flag missing values"
    },
    {
     "tool": "impute_missing",
@@ -1331,19 +1365,13 @@
     "params": {
      "strategy": "flag_only"
     },
-    "reason": "30% null percentage; flag missing values instead of filling."
+    "reason": "30% nulls in age column (highest); flag missing values"
    },
    {
     "tool": "drop_blank_rows",
     "col": null,
     "params": {},
-    "reason": "1 blank row detected in the table."
-   },
-   {
-    "tool": "drop_blank_columns",
-    "col": "note",
-    "params": {},
-    "reason": "Column 'note' is entirely empty (100% null)."
+    "reason": "1 blank row detected at table level"
    }
   ],
   "result": {
@@ -1386,13 +1414,13 @@
     "tool": "drop_blank_rows",
     "col": null,
     "params": {},
-    "reason": "user asked to delete everything (remove blank rows)"
+    "reason": "User asked to delete everything; removing blank rows is part of the cleanup."
    },
    {
     "tool": "drop_blank_columns",
     "col": null,
     "params": {},
-    "reason": "user asked to delete everything (remove blank columns)"
+    "reason": "User asked to delete everything; removing empty columns (note) completes the deletion request."
    }
   ],
   "result": {

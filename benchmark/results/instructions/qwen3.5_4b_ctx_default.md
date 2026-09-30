@@ -1,6 +1,6 @@
 # Instruction-following benchmark — `qwen3.5:4b`
 
-**34/39 instructions routed to the correct tool/column/params (87.2%)** — 21 unrequested extra steps across all cases.
+**33/39 instructions routed to the correct tool/column/params (84.6%)** — 25 unrequested extra steps across all cases.
 
 | kind | cases | pass |
 |---|---:|---:|
@@ -8,7 +8,7 @@
 | refusal | 3 | 1/3 |
 | scoped | 4 | 2/4 |
 | typo | 2 | 2/2 |
-| verbatim | 12 | 11/12 |
+| verbatim | 12 | 10/12 |
 
 | case | kind | instruction | pass | extras |
 |---|---|---|---|---:|
@@ -37,9 +37,9 @@
 | outliers_paraphrase | paraphrase | flag any unusual values in age | yes | 0 |
 | rule_scoped | scoped | flag ages outside 0 to 120 | NO | 1 |
 | trim_paraphrase | paraphrase | strip the extra spaces from the name column | yes | 0 |
-| drop_where_equals | verbatim | delete rows where status is Inactive | yes | 0 |
+| drop_where_equals | verbatim | delete rows where status is Inactive | NO | 3 |
 | drop_where_paraphrase | paraphrase | get rid of every customer whose department is HR | yes | 0 |
-| drop_where_null | paraphrase | remove the rows that have no age | yes | 0 |
+| drop_where_null | paraphrase | remove the rows that have no age | yes | 1 |
 | keep_only | scoped | keep only the rows where department is Sales | NO | 1 |
 | scale_minmax | verbatim | normalize age between 0 and 1 | yes | 0 |
 | scale_zscore | paraphrase | standardize the age column to z-scores | yes | 0 |

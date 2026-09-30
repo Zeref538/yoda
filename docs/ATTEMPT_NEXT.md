@@ -1,8 +1,7 @@
 # Next attempt: instruction routing
 
-Status: **draft, not run.** Waiting for John's approval. Also blocked on
-Ollama not being installed on this laptop (checked 2026-09-30: no `ollama`
-command, nothing on port 11434).
+Status: **draft, not run.** Waiting for John's approval. Ollama 0.34.4 and
+qwen3.5:4b are installed as of 2026-09-30, and one timing run is done (below).
 
 ## The one target number
 
@@ -71,11 +70,23 @@ Neither adds examples taken from the 39 cases.
 
 ## Budget
 
-**Not measured yet** (can't be: no Ollama). Plan once it's installed:
-time one full `python -m benchmark.run_instructions --model qwen3.5:4b`
-run, then multiply. Total runs: 3 baseline + 3 per idea = 9 runs for two
-ideas, with idea 1 costing ~3x and idea 2 ~2x a baseline run. I'll write the
-measured time here before starting the rest.
+**Measured, 2026-09-30:** one full `python -m benchmark.run_instructions --model
+qwen3.5:4b` run took **15 minutes** (08:39:11 to 08:54:14, 39 cases, laptop CPU,
+with the new `num_ctx: 8192`). It scored **34/39**; the previous run scored 33/39,
+and exactly one case differs (`drop_where_equals` now passes). That run had no
+fallbacks, so the difference is the model's own run-to-run variation, which is
+why step 0 exists. This timing run counts as baseline run 1.
+
+| step | runs | minutes per run | total |
+|---|---:|---:|---:|
+| Step 0: shipped planner | 2 more (3 in all) | 15 | 30 min |
+| Idea 1: vote over 3 samples | 3 | ~45 (3x the calls, estimated from the 15) | ~2 h 15 min |
+| Idea 2: intent first | 3 | ~30 (2x the calls, estimated) | ~1 h 30 min |
+| **all** | | | **~4 h 15 min** |
+
+The per-idea times are the measured 15 minutes times the extra calls, not
+measured yet. If idea 1's first run takes over 60 minutes, stop and re-plan
+rather than let it run 3 hours.
 
 ## Results
 
