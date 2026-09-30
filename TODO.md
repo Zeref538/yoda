@@ -1,6 +1,6 @@
 # TODO
 
-**Left to do**
+**Claude AI**
 - [ ] Finish the pre-registered attempt (docs/ATTEMPT_NEXT.md): vote3 runs 2-3, intent runs 1-3
 - [ ] Apply the win rule; write every result into ATTEMPT_NEXT.md, README and case study
 - [ ] Update the instruction score (33/39) in README, case study and portfolio card to the 3-run baseline average
