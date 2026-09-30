@@ -155,8 +155,12 @@ column, and params:
 
 | model | routed correctly | paraphrases | typos | refusals (3) |
 |---|---:|---:|---:|---:|
-| qwen3.5:4b | **33/39 (84.6%)** | **18/18** | **2/2** | 1/3 |
-| qwen3.5:2b | 26/39 (66.7%) | 13/18 | 1/2 | 1/3 |
+| qwen3.5:4b | **34/39 (87.2%)**, 3 runs | **18/18** | **2/2** | 1/3 |
+| qwen3.5:2b | 26/39 (66.7%), 1 run | 13/18 | 1/2 | 1/3 |
+
+The 4b score is the same in all 3 runs (34, 34, 34), and the same 5 asks fail
+every time, so the misses are consistent, not luck. An earlier single run
+scored 33/39 before the context-window fix; that one extra miss did not repeat.
 
 Findings ([full tables](benchmark/results/instructions/)):
 

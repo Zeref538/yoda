@@ -443,8 +443,8 @@ $("b-base").textContent = "The baseline gets the same profile and maps each trac
 const I4 = DATA.ins4, I2 = DATA.ins2;
 $("a-lede").textContent = "A second benchmark: " + I4.n + " requests typed the way people type "
   + "them, each labelled with the step a correct plan must contain. The 4B model routed "
-  + I4.passed + " of " + I4.n + " (" + pct(I4.passed / I4.n) + "), the 2B model " + I2.passed
-  + ". One run each.";
+  + DATA.ins4_runs.join(", ") + " of " + I4.n + " across " + DATA.ins4_runs.length
+  + " runs, failing the same asks each time. The 2B model routed " + I2.passed + ", in one run.";
 const kb = document.querySelector("#kinds tbody");
 for (const [k, v] of Object.entries(I4.kinds)) {
   const w = I2.kinds[k] || [0, 0], tr = kb.insertRow();

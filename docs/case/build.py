@@ -85,6 +85,7 @@ def main() -> None:
                    "real": {d: old["datasets"][d] for d in ORDER if d not in old["fell_back"]}},
         "ins4": instructions("qwen3.5_4b"),
         "ins2": instructions("qwen3.5_2b"),
+        "ins4_runs": [instructions(f"attempt/baseline_run{i}")["passed"] for i in (1, 2, 3)],
         "sees": sees(),
         "built": datetime.date.today().isoformat(),
     }
