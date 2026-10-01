@@ -1,5 +1,10 @@
 {
  "baseline_run2": 859,
  "baseline_run3": 865,
- "vote3_run1": 1448
+ "vote3_run1": 1448,
+ "vote3_run2": 1498,
+ "vote3_run3": 1528,
+ "intent_run1": 1022,
+ "intent_run2": 1112,
+ "intent_run3": 1071
 }

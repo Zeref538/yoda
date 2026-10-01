@@ -1,7 +1,7 @@
 # Next attempt: instruction routing
 
-Status: **draft, not run.** Waiting for John's approval. Ollama 0.34.4 and
-qwen3.5:4b are installed as of 2026-09-30, and one timing run is done (below).
+Status: **run 2026-09-30 to 2026-10-01, approved by John. Neither idea won;
+the shipped planner is unchanged.** Results at the bottom.
 
 ## The one target number
 
@@ -90,4 +90,38 @@ rather than let it run 3 hours.
 
 ## Results
 
-(empty until run)
+All 9 runs: `benchmark/results/instructions/attempt/`, times in `timings.json`.
+Same 39 cases, same fixture, same scorer, qwen3.5:4b, one laptop.
+
+| version | run 1 | run 2 | run 3 | mean | range | extra steps | minutes per run |
+|---|---:|---:|---:|---:|---|---|---:|
+| shipped (single) | 34 | 34 | 34 | 34.0 | 34-34 | 21, 21, 21 | 14-15 |
+| idea 1: vote over 3 | 34 | 34 | 34 | 34.0 | 34-34 | 18, 20, 17 | 24-25 |
+| idea 2: intent first | 34 | 34 | 34 | 34.0 | 34-34 | 20, 21, 22 | 17-19 |
+
+**Verdict by the rule written in advance:** a win needed a mean of at least 36.
+Both ideas averaged 34.0, the same as the shipped planner. Neither ships.
+
+**What it found:**
+
+- **The misses are not luck.** All 9 runs failed the same 5 asks:
+  `drop_outliers` (flags instead of removing), `keep_only` (loses the
+  inversion), `rule_scoped` ("flag ages outside 0 to 120"), and the refusals
+  `refuse_vague` and `refuse_destructive`. Idea 1 assumed coin-flip misses;
+  the model gives the same wrong answer every time, so a majority vote picks
+  it again.
+- **Naming the tool first did not move them either.** The intent call did not
+  change which 5 asks fail, including the two refusals it was aimed at.
+- **Voting trimmed unrequested extra steps slightly** (17-20 vs 21). Not part of
+  the win rule, and too small to ship a 1.7x slower planner for.
+- **The 33/39 published before was a single run** from before the context-window
+  fix. Three runs of the shipped planner give 34/39 with zero spread.
+- **Budget:** the plan guessed 45 and 30 minutes per run for the ideas; measured
+  24-25 and 17-19. The runner was killed twice (session restart, then the
+  laptop sleeping overnight) and resumed both times from the files on disk.
+
+**Next, if anyone tries again:** these 5 need a different kind of fix, since
+sampling and steering did nothing. Candidates: a validator-level rule for
+"remove" vs "flag" outliers, and explicit refusal examples, written on new
+cases so the 39 stay a fair test.
+

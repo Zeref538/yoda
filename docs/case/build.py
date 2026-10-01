@@ -73,6 +73,20 @@ def sees() -> dict:
             "rows": prof["n_rows"]}
 
 
+def attempt() -> dict:
+    """The pre-registered attempt (docs/ATTEMPT_NEXT.md): 3 runs per strategy."""
+    out = {}
+    for label in ("baseline", "vote3", "intent"):
+        runs = [json.loads((RES / "instructions" / "attempt" / f"{label}_run{i}.json")
+                           .read_text(encoding="utf-8")) for i in (1, 2, 3)]
+        out[label] = {"scores": [sum(r["result"]["pass"] for r in run) for run in runs],
+                      "extras": [sum(r["result"]["extra_steps"] for r in run) for run in runs],
+                      "fails": sorted({r["case"]["id"] for run in runs for r in run
+                                       if not r["result"]["pass"]}),
+                      "n": len(runs[0])}
+    return out
+
+
 def main() -> None:
     old = run("qwen3.5_4b_v3_ctx_default")  # the withdrawn run, kept as evidence
     data = {
@@ -86,6 +100,7 @@ def main() -> None:
         "ins4": instructions("qwen3.5_4b"),
         "ins2": instructions("qwen3.5_2b"),
         "ins4_runs": [instructions(f"attempt/baseline_run{i}")["passed"] for i in (1, 2, 3)],
+        "attempt": attempt(),
         "sees": sees(),
         "built": datetime.date.today().isoformat(),
     }

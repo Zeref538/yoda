@@ -267,17 +267,19 @@
   <div class="console-head"><span class="step-no">06</span><span class="caps">The next attempt</span></div>
   <div class="console-body">
     <div class="console-side"><div class="side-stick">
-    <h2 data-mode="plain">A plan to raise the weakest number, written before running it</h2>
-    <h2 data-mode="expert">Pre-registered: instruction routing, two ideas, a win rule fixed in advance</h2>
+    <h2 data-mode="plain">Two ideas to raise the weakest number. Neither moved it.</h2>
+    <h2 data-mode="expert">Pre-registered attempt on instruction routing: a clean negative result</h2>
     </div></div>
     <div class="console-main">
-      <p>The weakest agent number is instruction routing, and it comes from a single run.
-      The plan in <code>docs/ATTEMPT_NEXT.md</code> re-runs the current version three times
-      to measure the noise first. Then it tests two ideas: asking three times and keeping the
-      most common answer, and asking "which tool, or none?" before planning. Neither adds
-      examples copied from the test.</p>
-      <div class="note warn"><p class="kicker">Not run yet</p>
-      <p>No result is claimed, and none will be until the pre-written rule is met.</p></div>
+      <p>The plan in <code>docs/ATTEMPT_NEXT.md</code> was written before running anything.
+      Two ideas: asking three times and keeping the most common answer, and asking "which
+      tool, or none?" before planning. Three runs each, and a win had to beat the shipped
+      planner by two asks on average. Neither adds examples copied from the test.</p>
+      <div class="tw"><table id="att">
+        <thead><tr><th>Planner</th><th class="num">Runs (of 39)</th><th class="num">Mean</th><th class="num">Extra steps</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="note"><p class="kicker">Why nothing moved</p><p id="att-note"></p></div>
     </div>
   </div>
 </div>
@@ -482,6 +484,22 @@ $("k-cur").textContent = "With prompt v1 the model fixed " + pct(V1.types.curren
 $("k-small").textContent = "The 2B model got the same v2 prompt and fell to " + pct(S.detection)
   + " found. The extra instructions were more than it could hold, and it started skipping "
   + "obvious steps. One prompt doesn't suit every model size.";
+
+// 06 attempt
+const AT = DATA.attempt, names = { baseline: "Shipped, one answer", vote3: "Ask 3 times, keep the most common", intent: "Name the tool first" };
+const ab = document.querySelector("#att tbody");
+for (const [k, v] of Object.entries(AT)) {
+  const tr = ab.insertRow(), mean = v.scores.reduce((a, b) => a + b, 0) / v.scores.length;
+  tr.insertCell().textContent = names[k];
+  for (const x of [v.scores.join(", "), mean.toFixed(1), v.extras.join(", ")]) {
+    const c = tr.insertCell(); c.className = "num"; c.textContent = x;
+  }
+}
+const same = Object.values(AT).every(v => v.fails.join() === AT.baseline.fails.join());
+$("att-note").textContent = (same ? "Every run of every planner failed the same "
+  + AT.baseline.fails.length + " asks. " : "")
+  + "Retrying only helps when the wrong answers change between tries, and here they never did. "
+  + "The shipped planner stays as it was.";
 
 $("f-n").textContent = num(B.n) + " labelled errors, 6 datasets";
 $("f-built").textContent = "Built " + DATA.built + ".";

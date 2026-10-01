@@ -162,6 +162,13 @@ The 4b score is the same in all 3 runs (34, 34, 34), and the same 5 asks fail
 every time, so the misses are consistent, not luck. An earlier single run
 scored 33/39 before the context-window fix; that one extra miss did not repeat.
 
+**Tried to raise it, and it didn't move.** Two ideas were tested against a win
+rule written before running ([plan and full results](docs/ATTEMPT_NEXT.md)):
+asking 3 times and keeping the most common plan, and asking "which tool, or
+none?" before planning. Three runs each: **34, 34, 34 for both**, the same as the
+shipped planner, so neither shipped. The 5 misses are identical in all 9 runs,
+which is why: retrying only helps when the wrong answers change between tries.
+
 Findings ([full tables](benchmark/results/instructions/)):
 
 - **The 4b model handled every paraphrase and typo** ("remvoe the blnak rows
